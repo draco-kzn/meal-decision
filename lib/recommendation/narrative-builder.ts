@@ -4,9 +4,9 @@ import type { StrategyType } from "@/types/domain";
 function buildNarrativeLine(strategyType: StrategyType, toneStyle: string) {
   const styleMap: Record<StrategyType, Record<string, string>> = {
     STRICT: {
-      教练型: "这段时间是关键窗口，今天稳住，后面会轻松很多。",
-      温柔型: "离目标已经不远了，今天对自己克制一点，是在替未来省力。",
-      玄学型: "今天先守住口腹之欲，整天的运势会更顺一些。",
+      教练型: "这段时间是关键窗口，今天先稳住，后面会轻松很多。",
+      温柔型: "离目标已经不远了，今天对自己克制一点，是在替后面省力。",
+      玄学型: "今天先守住口腹之欲，整天的节奏会更顺一点。",
       毒舌型: "离目标就差临门一脚，别被一顿饭带偏。"
     },
     BALANCED: {
@@ -35,7 +35,7 @@ function buildNarrativeLine(strategyType: StrategyType, toneStyle: string) {
     }
   };
 
-  return styleMap[strategyType][toneStyle] ?? styleMap[strategyType]["温柔型"];
+  return styleMap[strategyType][toneStyle] ?? styleMap[strategyType].温柔型;
 }
 
 export function buildNarrative(
@@ -43,14 +43,13 @@ export function buildNarrative(
   strategyType: StrategyType,
   recommendedRestaurantName: string | null
 ) {
+  const daysLeft = context.goal
+    ? Math.max(Math.ceil((context.goal.targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)), 0)
+    : null;
+
   const rationaleParts = [
-    context.goal
-      ? `距离目标日期还有 ${Math.max(
-          Math.ceil((context.goal.targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-          0
-        )} 天。`
-      : "当前还没有设置目标日期。",
-    `今天心情是“${context.dailyContext.mood}”，自律意愿为“${context.dailyContext.disciplineLevel}”。`,
+    daysLeft === null ? "当前还没有设置目标日期。" : `距离目标日期还有 ${daysLeft} 天。`,
+    `今天心情是“${context.dailyContext.mood}”，自律意愿是“${context.dailyContext.disciplineLevel}”。`,
     context.location ? `当前地点是 ${context.location.name}。` : "当前没有绑定地点。",
     recommendedRestaurantName ? `推荐餐厅是 ${recommendedRestaurantName}。` : "当前没有命中可推荐的餐厅。"
   ];

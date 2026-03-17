@@ -26,7 +26,7 @@ export async function getRecentLowAdherenceCount(userId: string) {
   return prisma.dailyFeedback.count({
     where: {
       userId,
-      adherenceLevel: { in: ["低", "low", "LOW"] }
+      adherenceLevel: { in: ["low", "LOW", "低"] }
     }
   });
 }

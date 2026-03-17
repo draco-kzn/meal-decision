@@ -16,7 +16,7 @@ const OPENCLAW_API_KEY = process.env.OPENCLAW_API_KEY?.trim();
 
 function splitList(value: string) {
   return value
-    .split(/[，,、/\n]/)
+    .split(/[，,、\n]/)
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -45,7 +45,7 @@ function toStrategyType(strategyType: string) {
 }
 
 function serializeOrderList(value: string) {
-  return splitList(value.replace(/[。；;]/g, ","));
+  return splitList(value.replace(/[；;。]/g, ","));
 }
 
 async function callOpenClaw<T>(path: string, body: object, fallback: () => Promise<T>): Promise<T> {
@@ -76,9 +76,9 @@ function buildVirtualContext(user: User, currentLocationId: string | null, date:
     userId: user.id,
     date,
     currentLocationId,
-    mood: "一般",
-    disciplineLevel: "中",
-    socialPlan: "今晚无社交",
+    mood: "steady",
+    disciplineLevel: "medium",
+    socialPlan: "none",
     weightToday: null,
     stepsToday: null,
     sleepHours: null,
@@ -129,7 +129,8 @@ export async function pullMemory(userId: string): Promise<OpenClawMemoryResponse
         locationId: location.id,
         name: location.name,
         walkRadiusMin: Math.max(1, Math.round(location.walkRadiusM / 80)),
-        specialRules: splitList(location.notes)
+        specialRules: splitList(location.notes),
+        coverageStatus: (location.coverageStatus as "empty" | "partial" | "rich") ?? "empty"
       })),
       recentContext: {
         recentRestaurants: user.feedbacks
@@ -160,6 +161,7 @@ export async function enrichLocation(locationId: string): Promise<OpenClawLocati
     return {
       locationId: location.id,
       locationName: location.name,
+      coverageStatus: (location.coverageStatus as "empty" | "partial" | "rich") ?? "empty",
       restaurants: location.restaurants.map((restaurant) => ({
         restaurantId: restaurant.id,
         name: restaurant.name,
@@ -168,9 +170,12 @@ export async function enrichLocation(locationId: string): Promise<OpenClawLocati
         walkTimeMin: restaurant.walkMinutes,
         hours: restaurant.openHours,
         recommendedOrder: serializeOrderList(restaurant.recommendedOrders),
+        avoidOrders: serializeOrderList(restaurant.avoidOrders),
         riskTags: splitList(restaurant.riskTags),
+        notes: restaurant.notes,
         source: restaurant.source,
-        updatedAt: restaurant.updatedAt.toISOString().slice(0, 10)
+        updatedAt: restaurant.updatedAt.toISOString().slice(0, 10),
+        enrichmentConfidence: restaurant.enrichmentConfidence
       }))
     };
   });
@@ -178,9 +183,10 @@ export async function enrichLocation(locationId: string): Promise<OpenClawLocati
 
 export async function pushDailyRecommendation(
   userId: string,
-  date: string
+  date: string,
+  mealType = "lunch"
 ): Promise<OpenClawDailyRecommendationResponse> {
-  return callOpenClaw("/recommendation/push", { userId, date }, async () => {
+  return callOpenClaw("/recommendation/push", { userId, date, mealType }, async () => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new Error(`User ${userId} not found`);
@@ -196,16 +202,14 @@ export async function pushDailyRecommendation(
       ? await prisma.location.findUnique({ where: { id: existingContext.currentLocationId } })
       : locations[0] ?? null;
 
-    const dailyContext =
-      existingContext ??
-      buildVirtualContext(user, location?.id ?? null, new Date(date));
+    const dailyContext = existingContext ?? buildVirtualContext(user, location?.id ?? null, new Date(date));
 
     const generated = await generateRecommendation({
       user,
       goal,
       location,
       dailyContext,
-      mealType: "lunch"
+      mealType
     });
 
     const fallbackRestaurant = await prisma.restaurant.findFirst({
@@ -218,7 +222,9 @@ export async function pushDailyRecommendation(
     return {
       userId,
       date,
+      mealType,
       strategyType: toStrategyType(generated.strategyType),
+      locationName: location?.name ?? null,
       restaurant: generated.restaurantId
         ? {
             restaurantId: generated.restaurantId,
@@ -230,13 +236,15 @@ export async function pushDailyRecommendation(
         ? [
             {
               restaurantId: fallbackRestaurant.id,
-              name: fallbackRestaurant.name,
+              restaurantName: fallbackRestaurant.name,
               recommendedOrder: serializeOrderList(fallbackRestaurant.recommendedOrders)
             }
           ]
         : [],
       rationale: splitList(generated.rationale),
-      narrativeLine: generated.narrativeLine
+      narrativeLine: generated.narrativeLine,
+      sourceType: "RULE_ENGINE",
+      confidence: generated.confidence
     };
   });
 }

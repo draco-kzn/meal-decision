@@ -28,9 +28,9 @@ async function main() {
     data: {
       userId: user.id,
       title: "五一前减脂并稳定午餐节奏",
-      goalType: "减脂",
+      goalType: "fat_loss",
       targetDate: new Date("2026-05-01"),
-      intensity: "中等",
+      intensity: "medium",
       notes: "优先规律吃饭，不走极端节食。"
     }
   });
@@ -43,7 +43,8 @@ async function main() {
       sceneTags: "工作日午餐,加班晚餐",
       appearanceWindows: "周一到周五 11:30-14:00 / 18:30-21:00",
       walkRadiusM: 800,
-      notes: "中午不想排队太久，优先步行 10 分钟内。"
+      notes: "中午不想排队太久，优先步行 10 分钟内。",
+      coverageStatus: "partial"
     }
   });
 
@@ -55,7 +56,8 @@ async function main() {
       sceneTags: "晚餐,周末,恢复日",
       appearanceWindows: "工作日晚 19:00 后 / 周末全天",
       walkRadiusM: 1200,
-      notes: "晚餐更看重恢复和舒适度。"
+      notes: "晚餐更看重恢复和舒适度。",
+      coverageStatus: "partial"
     }
   });
 
@@ -72,9 +74,10 @@ async function main() {
         satietyScore: 72,
         riskTags: "容易吃不饱,酱料热量",
         recommendedOrders: "鸡腿肉藜麦能量碗，酱料减半",
-        avoidOrders: "双倍脆片和高糖饮料",
-        notes: "适合工作日中午的稳妥方案。",
-        source: "manual-seed"
+        avoidOrders: "双倍薯片和高糖饮料",
+        notes: "适合工作日中午的稳定方案。",
+        source: "manual-seed",
+        enrichmentConfidence: "medium"
       }
     }),
     prisma.restaurant.create({
@@ -91,7 +94,8 @@ async function main() {
         recommendedOrders: "番茄肥牛乌冬，少喝汤",
         avoidOrders: "炸鸡乌冬双拼",
         notes: "心情差时有安慰感，但还能控制住。",
-        source: "manual-seed"
+        source: "manual-seed",
+        enrichmentConfidence: "medium"
       }
     }),
     prisma.restaurant.create({
@@ -108,7 +112,8 @@ async function main() {
         recommendedOrders: "皮蛋瘦肉粥配清炒时蔬",
         avoidOrders: "油条双拼",
         notes: "恢复日和晚归时很稳。",
-        source: "manual-seed"
+        source: "manual-seed",
+        enrichmentConfidence: "medium"
       }
     }),
     prisma.restaurant.create({
@@ -125,7 +130,8 @@ async function main() {
         recommendedOrders: "半份原味炸鸡配气泡水",
         avoidOrders: "双拼炸鸡加芝士年糕",
         notes: "只适合允许放松日。",
-        source: "manual-seed"
+        source: "manual-seed",
+        enrichmentConfidence: "low"
       }
     })
   ]);
@@ -135,9 +141,9 @@ async function main() {
       userId: user.id,
       date: new Date("2026-03-17"),
       currentLocationId: office.id,
-      mood: "一般偏累",
-      disciplineLevel: "中",
-      socialPlan: "今晚无社交",
+      mood: "steady but tired",
+      disciplineLevel: "medium",
+      socialPlan: "none",
       weightToday: 69.7,
       stepsToday: 2400,
       sleepHours: 6.2,
@@ -157,11 +163,12 @@ async function main() {
       mealType: "lunch",
       strategyType: "BALANCED",
       restaurantId: restaurants[0].id,
-      recommendedOrder: "鸡腿肉藜麦能量碗，酱料减半，补一份热汤",
-      fallbackOption: "一碗乌冬：番茄肥牛乌冬，少喝汤不加炸物",
+      recommendedOrder: "鸡腿肉藜麦能量碗，酱料减半，补一份热汤。",
+      fallbackOption: "一碗乌冬：番茄肥牛乌冬，少喝汤，不加炸物。",
       rationale: "距离目标日还有一定空间，但今天睡眠一般、工作强度不低，午餐更适合稳定发挥而不是赌意志力。",
       narrativeLine: "今天别跟自己硬碰硬，吃得稳，下午状态会更值钱。",
       sourceType: "RULE_ENGINE",
+      confidence: "medium",
       rawContextJson: JSON.stringify({
         date: "2026-03-17",
         mealType: "lunch",
@@ -176,9 +183,11 @@ async function main() {
       userId: user.id,
       date: new Date("2026-03-16"),
       restaurantId: restaurants[2].id,
-      adherenceLevel: "高",
+      feedbackType: "direct_feedback",
+      adherenceLevel: "high",
       notes: "晚饭吃得很稳，睡前没有明显负担感。",
-      imageUrl: ""
+      imageUrl: "",
+      structuredPatchJson: JSON.stringify({ feeling: "stable" })
     }
   });
 

@@ -93,6 +93,7 @@ db.exec(`
     "appearanceWindows" TEXT NOT NULL,
     "walkRadiusM" INTEGER NOT NULL,
     "notes" TEXT NOT NULL,
+    "coverageStatus" TEXT NOT NULL DEFAULT 'empty',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Location_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -113,6 +114,7 @@ db.exec(`
     "avoidOrders" TEXT NOT NULL,
     "notes" TEXT NOT NULL,
     "source" TEXT NOT NULL,
+    "enrichmentConfidence" TEXT NOT NULL DEFAULT 'medium',
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Restaurant_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "Location" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -153,6 +155,7 @@ db.exec(`
     "rationale" TEXT NOT NULL,
     "narrativeLine" TEXT NOT NULL,
     "sourceType" TEXT NOT NULL DEFAULT 'RULE_ENGINE',
+    "confidence" TEXT NOT NULL DEFAULT 'medium',
     "rawContextJson" TEXT NOT NULL DEFAULT '{}',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -165,9 +168,11 @@ db.exec(`
     "userId" TEXT NOT NULL,
     "date" DATETIME NOT NULL,
     "restaurantId" TEXT,
+    "feedbackType" TEXT NOT NULL DEFAULT 'direct_feedback',
     "adherenceLevel" TEXT NOT NULL,
     "notes" TEXT NOT NULL,
     "imageUrl" TEXT,
+    "structuredPatchJson" TEXT NOT NULL DEFAULT '{}',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "DailyFeedback_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -175,6 +180,8 @@ db.exec(`
   );
 `);
 
+ensureColumn(db, "Location", "coverageStatus", "TEXT NOT NULL DEFAULT 'empty'");
+ensureColumn(db, "Restaurant", "enrichmentConfidence", "TEXT NOT NULL DEFAULT 'medium'");
 ensureColumn(db, "DailyContext", "currentLocationId", "TEXT");
 ensureColumn(db, "DailyContext", "weatherSummary", "TEXT");
 ensureColumn(db, "DailyContext", "weatherTempC", "REAL");
@@ -184,7 +191,10 @@ ensureColumn(db, "DailyContext", "astroTag", "TEXT");
 ensureColumn(db, "DailyContext", "notes", "TEXT NOT NULL DEFAULT ''");
 
 ensureColumn(db, "DailyRecommendation", "sourceType", "TEXT NOT NULL DEFAULT 'RULE_ENGINE'");
+ensureColumn(db, "DailyRecommendation", "confidence", "TEXT NOT NULL DEFAULT 'medium'");
 ensureColumn(db, "DailyRecommendation", "rawContextJson", "TEXT NOT NULL DEFAULT '{}'");
+ensureColumn(db, "DailyFeedback", "feedbackType", "TEXT NOT NULL DEFAULT 'direct_feedback'");
+ensureColumn(db, "DailyFeedback", "structuredPatchJson", "TEXT NOT NULL DEFAULT '{}'");
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS "Goal_userId_idx" ON "Goal"("userId");

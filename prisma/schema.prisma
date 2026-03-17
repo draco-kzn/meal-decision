@@ -49,6 +49,7 @@ model Location {
   appearanceWindows String
   walkRadiusM       Int
   notes             String
+  coverageStatus    String         @default("empty")
   restaurants       Restaurant[]
   dailyContexts     DailyContext[]
   createdAt         DateTime       @default(now())
@@ -71,6 +72,7 @@ model Restaurant {
   avoidOrders       String
   notes             String
   source            String
+  enrichmentConfidence String            @default("medium")
   recommendations   DailyRecommendation[]
   feedbacks         DailyFeedback[]
   updatedAt         DateTime             @updatedAt
@@ -116,6 +118,7 @@ model DailyRecommendation {
   rationale        String
   narrativeLine    String
   sourceType       String
+  confidence       String      @default("medium")
   rawContextJson   String
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -130,9 +133,11 @@ model DailyFeedback {
   date           DateTime
   restaurantId   String?
   restaurant     Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  feedbackType   String      @default("direct_feedback")
   adherenceLevel String
   notes          String
   imageUrl       String?
+  structuredPatchJson String  @default("{}")
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 }

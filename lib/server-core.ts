@@ -30,11 +30,38 @@ export async function listLocations(userId: string) {
   });
 }
 
-export async function listRestaurants(locationId?: string | null) {
+export async function findLocationByName(userId: string, name: string) {
+  return prisma.location.findFirst({
+    where: {
+      userId,
+      name: { equals: name }
+    }
+  });
+}
+
+export async function listRestaurants(locationId?: string | null, userId?: string | null) {
   return prisma.restaurant.findMany({
-    where: locationId ? { locationId } : undefined,
+    where: locationId
+      ? { locationId }
+      : userId
+        ? {
+            location: {
+              userId
+            }
+          }
+        : undefined,
     include: { location: true },
     orderBy: [{ createdAt: "asc" }]
+  });
+}
+
+export async function findRestaurantByName(userId: string, name: string, locationId?: string | null) {
+  return prisma.restaurant.findFirst({
+    where: {
+      name: { equals: name },
+      ...(locationId ? { locationId } : { location: { userId } })
+    },
+    include: { location: true }
   });
 }
 
@@ -62,7 +89,11 @@ export async function getRecommendationByDate(userId: string, dateKey?: string |
       }
     },
     include: {
-      restaurant: true
+      restaurant: {
+        include: {
+          location: true
+        }
+      }
     }
   });
 }
@@ -81,7 +112,7 @@ export async function getDashboardSnapshot(userId: string, dateKey?: string | nu
     prisma.user.findUnique({ where: { id: userId } }),
     getCurrentGoal(userId),
     listLocations(userId),
-    listRestaurants(),
+    listRestaurants(null, userId),
     listFeedback(userId, 5),
     getRecommendationByDate(userId, dateKey, "lunch")
   ]);
@@ -121,9 +152,9 @@ export async function ensureDailyContext(userId: string, dateKey?: string | null
       userId,
       date,
       currentLocationId: firstLocation?.id ?? null,
-      mood: "一般",
-      disciplineLevel: "中",
-      socialPlan: "今晚无社交",
+      mood: "steady",
+      disciplineLevel: "medium",
+      socialPlan: "none",
       notes: ""
     }
   });

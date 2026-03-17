@@ -11,7 +11,8 @@ const locationSchema = z.object({
   sceneTags: z.string().default(""),
   appearanceWindows: z.string().default(""),
   walkRadiusM: z.number(),
-  notes: z.string().default("")
+  notes: z.string().default(""),
+  coverageStatus: z.string().optional()
 });
 
 export async function GET() {

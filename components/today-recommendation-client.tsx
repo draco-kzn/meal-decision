@@ -7,6 +7,7 @@ import { toDateKey } from "@/lib/date";
 type LocationItem = {
   id: string;
   name: string;
+  coverageStatus?: string;
 };
 
 type DailyContextResponse = {
@@ -31,10 +32,31 @@ type RecommendationResponse = {
   fallbackOption: string;
   rationale: string;
   narrativeLine: string;
+  confidence?: string;
+  sourceType?: string;
   restaurant: {
     name: string;
+    location?: {
+      name: string;
+    } | null;
   } | null;
 } | null;
+
+const DEFAULT_CONTEXT: NonNullable<DailyContextResponse> = {
+  currentLocationId: null,
+  mood: "steady",
+  disciplineLevel: "medium",
+  socialPlan: "none",
+  weightToday: null,
+  stepsToday: null,
+  sleepHours: null,
+  weatherSummary: null,
+  weatherTempC: null,
+  lunarTag: null,
+  solarTermTag: null,
+  astroTag: null,
+  notes: ""
+};
 
 export function TodayRecommendationClient() {
   const [date, setDate] = useState(toDateKey());
@@ -65,24 +87,18 @@ export function TodayRecommendationClient() {
   }, [date, mealType]);
 
   async function saveContext() {
+    const current = {
+      ...DEFAULT_CONTEXT,
+      ...context,
+      currentLocationId: context?.currentLocationId ?? locationOptions[0]?.id ?? null
+    };
+
     const response = await fetch("/api/daily-context", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         date,
-        currentLocationId: context?.currentLocationId ?? null,
-        mood: context?.mood ?? "一般",
-        disciplineLevel: context?.disciplineLevel ?? "中",
-        socialPlan: context?.socialPlan ?? "今晚无社交",
-        weightToday: context?.weightToday ?? null,
-        stepsToday: context?.stepsToday ?? null,
-        sleepHours: context?.sleepHours ?? null,
-        weatherSummary: context?.weatherSummary ?? null,
-        weatherTempC: context?.weatherTempC ?? null,
-        lunarTag: context?.lunarTag ?? null,
-        solarTermTag: context?.solarTermTag ?? null,
-        astroTag: context?.astroTag ?? null,
-        notes: context?.notes ?? ""
+        ...current
       })
     });
 
@@ -91,19 +107,9 @@ export function TodayRecommendationClient() {
 
   function updateContext(field: string, value: string | number | null) {
     setContext((current) => ({
+      ...DEFAULT_CONTEXT,
+      ...current,
       currentLocationId: current?.currentLocationId ?? locationOptions[0]?.id ?? null,
-      mood: current?.mood ?? "一般",
-      disciplineLevel: current?.disciplineLevel ?? "中",
-      socialPlan: current?.socialPlan ?? "今晚无社交",
-      weightToday: current?.weightToday ?? null,
-      stepsToday: current?.stepsToday ?? null,
-      sleepHours: current?.sleepHours ?? null,
-      weatherSummary: current?.weatherSummary ?? null,
-      weatherTempC: current?.weatherTempC ?? null,
-      lunarTag: current?.lunarTag ?? null,
-      solarTermTag: current?.solarTermTag ?? null,
-      astroTag: current?.astroTag ?? null,
-      notes: current?.notes ?? "",
       [field]: value
     }));
   }
@@ -146,7 +152,7 @@ export function TodayRecommendationClient() {
           </select>
         </label>
         <label className="field">
-          <span className="field-label">当前地点</span>
+          <span className="field-label">当前位置</span>
           <select
             className="field-select"
             value={context?.currentLocationId ?? locationOptions[0]?.id ?? ""}
@@ -155,6 +161,7 @@ export function TodayRecommendationClient() {
             {locationOptions.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.name}
+                {location.coverageStatus ? ` (${location.coverageStatus})` : ""}
               </option>
             ))}
           </select>
@@ -171,12 +178,12 @@ export function TodayRecommendationClient() {
           <span className="field-label">今日自律意愿</span>
           <select
             className="field-select"
-            value={context?.disciplineLevel ?? "中"}
+            value={context?.disciplineLevel ?? "medium"}
             onChange={(event) => updateContext("disciplineLevel", event.target.value)}
           >
-            <option value="低">低</option>
-            <option value="中">中</option>
-            <option value="高">高</option>
+            <option value="low">低</option>
+            <option value="medium">中</option>
+            <option value="high">高</option>
           </select>
         </label>
         <label className="field">
@@ -256,7 +263,8 @@ export function TodayRecommendationClient() {
         </h3>
         <div className="mt-5 flex flex-wrap gap-3">
           <span className="stat-pill">策略 {recommendation?.strategyType ?? "待生成"}</span>
-          <span className="stat-pill">推荐点法 {recommendation?.recommendedOrder ?? "待生成"}</span>
+          {recommendation?.confidence ? <span className="stat-pill">置信度 {recommendation.confidence}</span> : null}
+          {recommendation?.sourceType ? <span className="stat-pill">来源 {recommendation.sourceType}</span> : null}
         </div>
         <div className="mt-6 grid gap-4">
           <section className="rounded-[24px] bg-white/60 p-5">

@@ -29,6 +29,22 @@ function buildOrder(strategyType: RecommendationResult["strategyType"], order: s
   return order;
 }
 
+function inferConfidence(params: {
+  hasRestaurant: boolean;
+  candidateCount: number;
+  hasDynamicSignals: boolean;
+}) {
+  if (params.hasRestaurant && params.candidateCount >= 4 && params.hasDynamicSignals) {
+    return "high" as const;
+  }
+
+  if (params.hasRestaurant && params.candidateCount >= 2) {
+    return "medium" as const;
+  }
+
+  return "low" as const;
+}
+
 export async function generateRecommendation(params: GenerateRecommendationParams): Promise<RecommendationResult> {
   const context = await buildRecommendationContext(params);
   const ruleOutput = runRuleEngine(context);
@@ -47,8 +63,18 @@ export async function generateRecommendation(params: GenerateRecommendationParam
   return {
     strategyType: ruleOutput.strategyType,
     sourceType: "RULE_ENGINE",
+    confidence: inferConfidence({
+      hasRestaurant: Boolean(recommendedRestaurant),
+      candidateCount: ruleOutput.candidates.length,
+      hasDynamicSignals: Boolean(
+        context.dynamicSignals.weatherSummary ||
+          context.dynamicSignals.lunarTag ||
+          context.dynamicSignals.solarTermTag ||
+          context.dynamicSignals.astroTag
+      )
+    }),
     restaurantId: recommendedRestaurant?.id ?? null,
-    restaurantName: recommendedRestaurant?.name ?? "便利店高蛋白便当",
+    restaurantName: recommendedRestaurant?.name ?? "高蛋白便当",
     recommendedOrder: recommendedRestaurant
       ? buildOrder(ruleOutput.strategyType, recommendedRestaurant.recommendedOrders)
       : "选择一份高蛋白便当加无糖热饮，先保底。",

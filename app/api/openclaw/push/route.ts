@@ -5,7 +5,8 @@ import { pushDailyRecommendation, receiveOpenClawPush } from "@/lib/openclaw";
 
 const recommendationRequestSchema = z.object({
   userId: z.string().min(1),
-  date: z.string().min(1)
+  date: z.string().min(1),
+  mealType: z.string().optional()
 });
 
 export async function POST(request: Request) {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
 
   const parsed = recommendationRequestSchema.safeParse(payload);
   if (parsed.success) {
-    const result = await pushDailyRecommendation(parsed.data.userId, parsed.data.date);
+    const result = await pushDailyRecommendation(parsed.data.userId, parsed.data.date, parsed.data.mealType);
     return NextResponse.json(result);
   }
 

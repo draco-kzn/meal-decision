@@ -3,11 +3,20 @@ import { z } from "zod";
 
 import { importDailyRecommendation } from "@/lib/recommendation/provider-adapters/openclaw";
 
+const fallbackOptionSchema = z.object({
+  restaurantId: z.string().optional(),
+  restaurantName: z.string().optional(),
+  name: z.string().optional(),
+  recommendedOrder: z.union([z.array(z.string()), z.string()]).optional()
+});
+
 const schema = z.object({
-  userId: z.string().min(1),
+  userId: z.string().optional(),
   date: z.string().min(1),
-  mealType: z.string().optional(),
+  mealType: z.string().default("lunch"),
   strategyType: z.string().min(1),
+  locationName: z.string().optional(),
+  restaurantName: z.string().optional(),
   restaurant: z
     .object({
       restaurantId: z.string().optional(),
@@ -16,9 +25,11 @@ const schema = z.object({
     .nullable()
     .optional(),
   recommendedOrder: z.union([z.array(z.string()), z.string()]),
-  fallbackOption: z.any().optional(),
+  fallbackOption: z.union([z.array(fallbackOptionSchema), z.string(), z.any()]).optional(),
   rationale: z.union([z.array(z.string()), z.string()]),
   narrativeLine: z.string().min(1),
+  sourceType: z.string().default("OPENCLAW"),
+  confidence: z.string().default("medium"),
   rawContextJson: z.any().optional()
 });
 

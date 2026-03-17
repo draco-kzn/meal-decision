@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
-import { listRestaurants } from "@/lib/server-core";
+import { listRestaurants, requirePrimaryUser } from "@/lib/server-core";
 
 const restaurantSchema = z.object({
   id: z.string().optional(),
@@ -18,13 +18,15 @@ const restaurantSchema = z.object({
   recommendedOrders: z.string().default(""),
   avoidOrders: z.string().default(""),
   notes: z.string().default(""),
-  source: z.string().default("manual")
+  source: z.string().default("manual"),
+  enrichmentConfidence: z.string().default("medium")
 });
 
 export async function GET(request: Request) {
+  const user = await requirePrimaryUser();
   const { searchParams } = new URL(request.url);
   const locationId = searchParams.get("locationId");
-  const restaurants = await listRestaurants(locationId);
+  const restaurants = await listRestaurants(locationId, user.id);
   return NextResponse.json(restaurants);
 }
 

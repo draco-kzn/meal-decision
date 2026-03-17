@@ -17,6 +17,7 @@ export type OpenClawMemoryResponse = {
     name: string;
     walkRadiusMin: number;
     specialRules: string[];
+    coverageStatus: "empty" | "partial" | "rich";
   }>;
   recentContext: {
     recentRestaurants: string[];
@@ -32,6 +33,8 @@ export type OpenClawMemoryResponse = {
 export type OpenClawLocationEnrichmentResponse = {
   locationId: string;
   locationName: string;
+  coverageStatus?: "empty" | "partial" | "rich";
+  suggestedNextStep?: string;
   restaurants: Array<{
     restaurantId: string;
     name: string;
@@ -40,28 +43,35 @@ export type OpenClawLocationEnrichmentResponse = {
     walkTimeMin: number;
     hours: string;
     recommendedOrder: string[];
+    avoidOrders: string[];
     riskTags: string[];
+    notes: string;
     source: string;
     updatedAt: string;
+    enrichmentConfidence: string;
   }>;
 };
 
 export type OpenClawDailyRecommendationResponse = {
   userId: string;
   date: string;
+  mealType: string;
   strategyType: string;
+  locationName: string | null;
   restaurant: {
     restaurantId: string;
     name: string;
   } | null;
   recommendedOrder: string[];
   fallbackOption: Array<{
-    restaurantId: string;
-    name: string;
+    restaurantId?: string;
+    restaurantName: string;
     recommendedOrder: string[];
   }>;
   rationale: string[];
   narrativeLine: string;
+  sourceType: "OPENCLAW" | "RULE_ENGINE" | "HYBRID";
+  confidence: "low" | "medium" | "high";
 };
 
 export type OpenClawFeedbackPayload = {

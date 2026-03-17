@@ -1,20 +1,39 @@
 # 今天吃什么呢？
 
-一个围绕目标日期做每日饮食决策的个人助理型 Web MVP。
+一个围绕目标日期做每日饮食决策的个人助手型 Web MVP。
 
-当前项目已经从第一阶段的前端演示站，升级为第二阶段的 API 驱动产品骨架。
+当前这版已经从“OpenClaw Ready”推进到“OpenClaw Connected”的应用侧集成状态：
+- 页面端仍然负责建档、目标、地点包、餐厅库和建议展示
+- OpenClaw 可以通过稳定 API 做餐厅补全、每日推荐导入、反馈回写和上下文同步
+- 应用端保留本地规则引擎，OpenClaw 作为外部 agent layer 接入，而不是替代主数据库
 
-## 第二阶段已完成内容
+## 当前能力
 
-- 扩展 Prisma 数据模型，补齐 `DailyContext` 和 `DailyRecommendation` 的关键字段
-- 建立稳定 API 边界，而不是让页面直接拼 seed 和本地逻辑
-- 拆分 recommendation 模块：
-  - `lib/recommendation/context-builder.ts`
-  - `lib/recommendation/rule-engine.ts`
-  - `lib/recommendation/narrative-builder.ts`
-  - `lib/recommendation/provider-adapters/*`
-- 将 Dashboard 和 今日建议页改成 API 驱动
-- 补齐 OpenClaw 导入/回写接口
+- Dashboard
+- Profile setup
+- Goals
+- Location packs
+- Restaurant library
+- Daily recommendation
+- Feedback
+
+## Phase 2 对齐点
+
+这次补齐的是应用侧与 OpenClaw 二期 brief 的契约，而不是重做前端。
+
+已完成：
+- 扩展 Prisma 数据模型
+  - `Location.coverageStatus`
+  - `Restaurant.enrichmentConfidence`
+  - `DailyRecommendation.confidence`
+  - `DailyFeedback.feedbackType`
+  - `DailyFeedback.structuredPatchJson`
+- `/api/restaurants/enrich` 兼容单餐厅和批量 enrichment payload
+- `/api/recommendations/import` 兼容 OpenClaw recommendation import payload
+- `/api/feedback/import` 支持结构化 chat feedback 导入，并在 `daily_context` 场景下同步更新 `DailyContext`
+- `/api/daily-context` 支持 brief 里的轻量 daily context payload
+- 增加 location coverage 评估逻辑，餐厅 enrichment 后会自动更新覆盖度
+- Dashboard 和 Today 页面展示新的 recommendation 来源与置信度
 
 ## 技术栈
 
@@ -26,9 +45,7 @@
 - SQLite
 - Vercel
 
-## 数据模型
-
-当前核心模型：
+## 核心模型
 
 - `User`
 - `Goal`
@@ -38,185 +55,106 @@
 - `DailyRecommendation`
 - `DailyFeedback`
 
-其中第二阶段新增/强化：
+## OpenClaw 对接 API
 
-### DailyContext
-
-承接某一天的动态上下文：
-
-- `date`
-- `currentLocationId`
-- `mood`
-- `disciplineLevel`
-- `socialPlan`
-- `weightToday`
-- `stepsToday`
-- `sleepHours`
-- `weatherSummary`
-- `weatherTempC`
-- `lunarTag`
-- `solarTermTag`
-- `astroTag`
-- `notes`
-
-### DailyRecommendation
-
-保存某天某餐次的 recommendation 结果：
-
-- `strategyType`
-- `restaurantId`
-- `recommendedOrder`
-- `fallbackOption`
-- `rationale`
-- `narrativeLine`
-- `sourceType`
-- `rawContextJson`
-
-## 已实现 API
-
-### 读取类 API
-
+读取：
 - `GET /api/profile`
 - `GET /api/goals/current`
 - `GET /api/locations`
 - `GET /api/restaurants?locationId=xxx`
 - `GET /api/daily-context?date=YYYY-MM-DD`
-- `GET /api/recommendations?date=YYYY-MM-DD&mealType=lunch`
-- `GET /api/dashboard?date=YYYY-MM-DD`
-- `GET /api/feedback?limit=5`
 
-### 写入类 API
-
-- `POST /api/profile`
-- `POST /api/goals`
-- `POST /api/locations`
-- `POST /api/restaurants`
-- `POST /api/daily-context`
-- `POST /api/recommendations`
-- `POST /api/feedback`
-
-### recommendation / OpenClaw 相关 API
-
-- `POST /api/recommendations/generate`
-- `POST /api/recommendations/import`
+写入：
 - `POST /api/restaurants/enrich`
+- `POST /api/recommendations/import`
 - `POST /api/feedback/import`
+- `POST /api/daily-context`
 
-### OpenClaw 适配层 API
-
+适配层：
 - `POST /api/openclaw/memory`
 - `POST /api/openclaw/location`
 - `POST /api/openclaw/push`
 - `POST /api/openclaw/feedback`
 
-## recommendation 模块结构
+## 示例 payload
 
-### `lib/recommendation/context-builder.ts`
+### `POST /api/restaurants/enrich`
 
-负责聚合：
+```json
+{
+  "locationName": "公司",
+  "name": "轻食厨房",
+  "cuisine": "salad",
+  "openHours": "11:00-20:30",
+  "recommendedOrders": ["鸡胸双拼", "玉米", "温蔬菜"],
+  "avoidOrders": ["甜饮", "重酱拌碗"],
+  "notes": "稳定的工作日午餐选项",
+  "source": ["https://example.com/menu"],
+  "updatedAt": "2026-03-17",
+  "enrichmentConfidence": "medium"
+}
+```
 
-- user
-- current goal
-- selected location
-- restaurants
-- daily context
-- weather/lunar/astro provider signal
-- recent weight trend
-- recent adherence trend
+### `POST /api/recommendations/import`
 
-### `lib/recommendation/rule-engine.ts`
+```json
+{
+  "date": "2026-03-17",
+  "mealType": "lunch",
+  "strategyType": "balanced",
+  "locationName": "公司",
+  "restaurantName": "轻食厨房",
+  "recommendedOrder": ["鸡胸双拼", "玉米", "温蔬菜", "酱料分开"],
+  "fallbackOption": [
+    {
+      "restaurantName": "牛肉面馆",
+      "recommendedOrder": ["清汤牛肉面", "不要额外小菜"]
+    }
+  ],
+  "rationale": [
+    "距离公司近",
+    "容易控制",
+    "符合今天的 balanced 策略"
+  ],
+  "narrativeLine": "午餐先稳住，晚上再给自己留一点空间。",
+  "sourceType": "OPENCLAW",
+  "confidence": "medium"
+}
+```
 
-负责输出：
+### `POST /api/feedback/import`
 
-- `STRICT`
-- `BALANCED`
-- `RELAXED`
-- `SOCIAL_COMP`
-- `RECOVERY`
+```json
+{
+  "date": "2026-03-17",
+  "feedbackType": "daily_context",
+  "rawText": "今天太累了，别给我太严格",
+  "structuredPatch": {
+    "energy": "low",
+    "socialTonight": false
+  }
+}
+```
 
-并给出候选餐厅列表。
+### `POST /api/daily-context`
 
-### `lib/recommendation/narrative-builder.ts`
-
-负责基于叙事风格生成展示文案。
-
-### `lib/recommendation/provider-adapters/`
-
-当前包含：
-
-- `weather.ts`
-- `lunar.ts`
-- `astrology.ts`
-- `openclaw.ts`
-
-默认先走占位/本地适配，后续可以替换成真实外部服务。
-
-## 当前页面状态
-
-### Dashboard
-
-已改成 API 驱动：
-
-- 读取 `/api/dashboard`
-- 不再直接依赖 seed 数据
-- 实时展示当前目标、剩余天数、今日 recommendation、地点数、餐厅数、最近反馈、叙事风格
-
-### 今日建议页
-
-已改成 API 驱动：
-
-- 可选择 `date`
-- 可选择 `mealType`
-- 可选择 location
-- 先保存 `DailyContext`
-- 再调用 `POST /api/recommendations/generate`
-
-## OpenClaw 边界
-
-网页端负责：
-
-- profile / goals / locations / restaurants 的录入与管理
-- DailyContext 的录入
-- recommendation 的展示
-- 调用 OpenClaw 接口
-
-OpenClaw 负责：
-
-- 长期记忆
-- 餐厅/地点信息补全
-- recommendation 导入
-- 聊天反馈结构化
-- 反馈沉淀
+```json
+{
+  "date": "2026-03-17",
+  "locationName": "公司",
+  "energy": "low",
+  "wantsSpicy": false,
+  "socialTonight": true
+}
+```
 
 ## 本地运行
 
-1. 安装依赖
-
 ```powershell
 npm install
-```
-
-2. 生成 Prisma Client
-
-```powershell
 npm run db:generate
-```
-
-3. 初始化 SQLite
-
-```powershell
 npm run db:push
-```
-
-4. 写入示例数据
-
-```powershell
 npm run db:seed
-```
-
-5. 启动开发环境
-
-```powershell
 npm run dev
 ```
 
@@ -226,14 +164,8 @@ npm run dev
 npm run build
 ```
 
-## 第二阶段完成标准
+## 说明
 
-当前这版已经满足：
-
-- 录入 profile / goals / locations / restaurants
-- 创建某天的 `DailyContext`
-- 通过 API 触发 recommendation generation
-- 后端基于真实数据库数据生成 recommendation
-- recommendation 可以被未来的 OpenClaw 定时任务导入或覆盖
-
-这一步完成后，项目已经从“原型展示站”进入“可联调产品阶段”。
+- `npm run db:push` 仍然走本地 SQLite bootstrap 脚本，不依赖 Prisma schema engine
+- Vercel 通过 `postinstall` 自动执行 `prisma generate`
+- 当前推荐仍可由本地规则引擎生成，也可以被 OpenClaw import 覆盖

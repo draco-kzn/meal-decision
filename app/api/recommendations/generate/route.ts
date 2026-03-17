@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       rationale: generated.rationale,
       narrativeLine: generated.narrativeLine,
       sourceType: generated.sourceType,
+      confidence: generated.confidence,
       rawContextJson: generated.rawContextJson
     },
     create: {
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
       rationale: generated.rationale,
       narrativeLine: generated.narrativeLine,
       sourceType: generated.sourceType,
+      confidence: generated.confidence,
       rawContextJson: generated.rawContextJson
     },
     include: {

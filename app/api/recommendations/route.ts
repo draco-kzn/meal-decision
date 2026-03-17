@@ -15,6 +15,7 @@ const schema = z.object({
   rationale: z.string().default(""),
   narrativeLine: z.string().default(""),
   sourceType: z.string().default("RULE_ENGINE"),
+  confidence: z.string().default("medium"),
   rawContextJson: z.string().default("{}")
 });
 

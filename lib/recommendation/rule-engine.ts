@@ -1,14 +1,18 @@
 import type { Restaurant } from "@prisma/client";
 
-import type { RuleEngineOutput } from "@/lib/recommendation/types";
+import type { RecommendationContext, RuleEngineOutput } from "@/lib/recommendation/types";
 
 function daysUntil(targetDate: Date | null) {
   if (!targetDate) {
     return 30;
   }
 
-  const diff = targetDate.getTime() - new Date().getTime();
+  const diff = targetDate.getTime() - Date.now();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+function matchesPattern(value: string, pattern: RegExp) {
+  return pattern.test(value.toLowerCase());
 }
 
 function scoreRestaurant(restaurant: Restaurant, output: RuleEngineOutput, locationName: string | null) {
@@ -34,18 +38,25 @@ function scoreRestaurant(restaurant: Restaurant, output: RuleEngineOutput, locat
     score += restaurant.healthyScore * 0.22;
   }
 
-  if (output.strategyType === "RECOVERY" && /粥|汤|轻食|沙拉/.test(restaurant.cuisine)) {
+  if (
+    output.strategyType === "RECOVERY" &&
+    /soup|congee|light|salad|粥|汤|轻食|沙拉/i.test(restaurant.cuisine)
+  ) {
     score += 18;
   }
 
   return score;
 }
 
-export function runRuleEngine(context: import("@/lib/recommendation/types").RecommendationContext): RuleEngineOutput {
+export function runRuleEngine(context: RecommendationContext): RuleEngineOutput {
   const daysLeft = daysUntil(context.goal?.targetDate ?? null);
-  const moodLow = /累|差|烦|低落/.test(context.dailyContext.mood);
-  const disciplineHigh = context.dailyContext.disciplineLevel === "高";
-  const socialTonight = /社交|聚餐|约会/.test(context.dailyContext.socialPlan);
+  const mood = context.dailyContext.mood ?? "";
+  const socialPlan = context.dailyContext.socialPlan ?? "";
+  const disciplineLevel = context.dailyContext.disciplineLevel ?? "medium";
+  const moodLow = matchesPattern(mood, /(low|tired|stress|sad|累|困|疲惫|低落)/i);
+  const disciplineHigh = matchesPattern(disciplineLevel, /(high|高)/i);
+  const disciplineLow = matchesPattern(disciplineLevel, /(low|低)/i);
+  const socialTonight = matchesPattern(socialPlan, /(social|dinner|party|date|聚餐|社交|约会)/i);
   const weightUp = context.recentWeightTrendKg > 0.4;
   const poorSleep = (context.dailyContext.sleepHours ?? 7) < 6;
 
@@ -54,32 +65,32 @@ export function runRuleEngine(context: import("@/lib/recommendation/types").Reco
 
   if (daysLeft <= 14) {
     strategyType = "STRICT";
-    reasons.push("距离目标日期已经很近，今天需要提高节制权重。");
+    reasons.push("距离目标日期已经比较近，今天更适合稳一点。");
   }
 
   if (weightUp && disciplineHigh) {
     strategyType = "STRICT";
-    reasons.push("最近 7 日体重有上升，自律意愿又较高，适合更稳一点。");
+    reasons.push("最近体重有回弹，自律意愿又不低，今天可以收一收。");
   }
 
   if (socialTonight && context.mealType === "lunch") {
     strategyType = "SOCIAL_COMP";
-    reasons.push("今晚有社交安排，中午建议提前做补偿，给晚上留出弹性。");
+    reasons.push("今晚有社交安排，中午更适合提前留出弹性。");
   }
 
   if (poorSleep && moodLow) {
     strategyType = "RECOVERY";
-    reasons.push("睡眠不足且心情偏低，今天更适合恢复型方案。");
+    reasons.push("睡眠和精神状态都一般，今天优先恢复感而不是极端克制。");
   }
 
-  if (moodLow && !disciplineHigh && strategyType === "BALANCED") {
+  if (moodLow && disciplineLow && strategyType === "BALANCED") {
     strategyType = "RELAXED";
-    reasons.push("今天状态一般，允许一点满足感，但仍然需要控制边界。");
+    reasons.push("今天状态不算强，允许一点满足感，但仍然要可控。");
   }
 
   if (context.recentLowAdherenceCount >= 2 && strategyType === "STRICT") {
     strategyType = "BALANCED";
-    reasons.push("最近执行度偏低，继续极端严格反而不利于执行。");
+    reasons.push("最近执行度偏低，继续过严容易直接破功。");
   }
 
   const ranked = [...context.restaurants].sort(

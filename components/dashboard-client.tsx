@@ -16,6 +16,8 @@ type DashboardResponse = {
     recommendedOrder: string;
     rationale: string;
     narrativeLine: string;
+    confidence?: string;
+    sourceType?: string;
     restaurant: {
       name: string;
     } | null;
@@ -62,14 +64,20 @@ export function DashboardClient() {
               {data.recommendation?.restaurant?.name ?? "今天还没有生成建议"}
             </h3>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--color-ink-700)]">
-              {data.recommendation?.rationale ?? "请先到“今日建议”页创建 DailyContext 并触发 recommendation。"}
+              {data.recommendation?.rationale ?? "先去“今日建议”页保存 DailyContext，再触发 recommendation 生成。"}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <span className="stat-pill">策略类型 {data.recommendation?.strategyType ?? "待生成"}</span>
+              <span className="stat-pill">策略 {data.recommendation?.strategyType ?? "待生成"}</span>
               <span className="stat-pill">推荐点法 {data.recommendation?.recommendedOrder ?? "待生成"}</span>
+              {data.recommendation?.confidence ? (
+                <span className="stat-pill">置信度 {data.recommendation.confidence}</span>
+              ) : null}
+              {data.recommendation?.sourceType ? (
+                <span className="stat-pill">来源 {data.recommendation.sourceType}</span>
+              ) : null}
             </div>
             <p className="mt-6 rounded-[22px] bg-[rgba(25,18,13,0.92)] px-5 py-4 text-sm leading-7 text-white">
-              {data.recommendation?.narrativeLine ?? "当前系统已经改成 API 驱动，下一步是生成今天的建议。"}
+              {data.recommendation?.narrativeLine ?? "当前系统已经切到 API 驱动，下一步是写入今天的建议结果。"}
             </p>
           </div>
 

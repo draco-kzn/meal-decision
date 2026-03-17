@@ -7,9 +7,11 @@ import { listFeedback, requirePrimaryUser } from "@/lib/server-core";
 const schema = z.object({
   date: z.string().min(1),
   restaurantId: z.string().nullable().optional(),
-  adherenceLevel: z.string().default("中"),
+  feedbackType: z.string().default("direct_feedback"),
+  adherenceLevel: z.string().default("medium"),
   notes: z.string().default(""),
-  imageUrl: z.string().nullable().optional()
+  imageUrl: z.string().nullable().optional(),
+  structuredPatchJson: z.string().default("{}")
 });
 
 export async function GET(request: Request) {
@@ -34,9 +36,11 @@ export async function POST(request: Request) {
       userId: user.id,
       date: new Date(parsed.data.date),
       restaurantId: parsed.data.restaurantId ?? null,
+      feedbackType: parsed.data.feedbackType,
       adherenceLevel: parsed.data.adherenceLevel,
       notes: parsed.data.notes,
-      imageUrl: parsed.data.imageUrl ?? null
+      imageUrl: parsed.data.imageUrl ?? null,
+      structuredPatchJson: parsed.data.structuredPatchJson
     }
   });
 
