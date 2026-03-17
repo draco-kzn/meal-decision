@@ -78,20 +78,26 @@ model Restaurant {
 }
 
 model DailyContext {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   date              DateTime
+  currentLocationId String?
+  currentLocation   Location? @relation(fields: [currentLocationId], references: [id], onDelete: SetNull)
   mood              String
   disciplineLevel   String
   socialPlan        String
-  currentLocationId String?
-  currentLocation   Location? @relation(fields: [currentLocationId], references: [id], onDelete: SetNull)
   weightToday       Float?
   stepsToday        Int?
   sleepHours        Float?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  weatherSummary    String?
+  weatherTempC      Float?
+  lunarTag          String?
+  solarTermTag      String?
+  astroTag          String?
+  notes             String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([userId, date])
 }
@@ -109,6 +115,8 @@ model DailyRecommendation {
   fallbackOption   String
   rationale        String
   narrativeLine    String
+  sourceType       String
+  rawContextJson   String
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 

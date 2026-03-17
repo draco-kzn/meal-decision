@@ -1,20 +1,20 @@
 # 今天吃什么呢？
 
-一个围绕目标日期来做每日饮食与生活决策的个人助理型 Web MVP。
+一个围绕目标日期做每日饮食决策的个人助理型 Web MVP。
 
-线上地址：
+当前项目已经从第一阶段的前端演示站，升级为第二阶段的 API 驱动产品骨架。
 
-- https://meal-decision-assistant.vercel.app
+## 第二阶段已完成内容
 
-## 项目定位
-
-这个项目不是简单的“随机吃什么”工具，而是一个围绕用户目标、地点、当天状态和餐厅知识库来生成建议的决策助手。
-
-第一版重点解决三件事：
-
-- 让用户先把目标、地点和餐厅库整理出来
-- 基于规则引擎给出“今天吃什么”的明确建议
-- 为后续接入 OpenClaw 作为 agent layer 预留完整接口
+- 扩展 Prisma 数据模型，补齐 `DailyContext` 和 `DailyRecommendation` 的关键字段
+- 建立稳定 API 边界，而不是让页面直接拼 seed 和本地逻辑
+- 拆分 recommendation 模块：
+  - `lib/recommendation/context-builder.ts`
+  - `lib/recommendation/rule-engine.ts`
+  - `lib/recommendation/narrative-builder.ts`
+  - `lib/recommendation/provider-adapters/*`
+- 将 Dashboard 和 今日建议页改成 API 驱动
+- 补齐 OpenClaw 导入/回写接口
 
 ## 技术栈
 
@@ -26,54 +26,167 @@
 - SQLite
 - Vercel
 
-## 当前能力
+## 数据模型
 
-- Dashboard：首页展示当前目标、剩余天数、今日建议主卡和快捷入口
-- 建档页：维护昵称、身高体重、饮食偏好、饮食禁忌、预算等级、叙事风格
-- 目标页：维护目标标题、目标类型、目标日期、强度和备注
-- 地点包页：维护常驻地点、场景标签、常出现时段、可接受步行距离
-- 餐厅知识库页：按地点筛选餐厅，支持新增、编辑、删除
-- 今日建议页：根据当天状态生成策略类型、推荐餐厅、推荐点法、备选方案、解释原因和一句叙事文案
-- 反馈页：记录今天实际吃了什么、执行度和备注
-- OpenClaw 适配层：预留长期记忆、地点补全、每日推送、反馈回写的接口
+当前核心模型：
 
-## OpenClaw 集成边界
+- `User`
+- `Goal`
+- `Location`
+- `Restaurant`
+- `DailyContext`
+- `DailyRecommendation`
+- `DailyFeedback`
 
-应用侧负责：
+其中第二阶段新增/强化：
 
-- 用户建档
-- 目标管理
-- 地点包管理
-- 餐厅知识库展示与维护
-- 今日建议展示
+### DailyContext
+
+承接某一天的动态上下文：
+
+- `date`
+- `currentLocationId`
+- `mood`
+- `disciplineLevel`
+- `socialPlan`
+- `weightToday`
+- `stepsToday`
+- `sleepHours`
+- `weatherSummary`
+- `weatherTempC`
+- `lunarTag`
+- `solarTermTag`
+- `astroTag`
+- `notes`
+
+### DailyRecommendation
+
+保存某天某餐次的 recommendation 结果：
+
+- `strategyType`
+- `restaurantId`
+- `recommendedOrder`
+- `fallbackOption`
+- `rationale`
+- `narrativeLine`
+- `sourceType`
+- `rawContextJson`
+
+## 已实现 API
+
+### 读取类 API
+
+- `GET /api/profile`
+- `GET /api/goals/current`
+- `GET /api/locations`
+- `GET /api/restaurants?locationId=xxx`
+- `GET /api/daily-context?date=YYYY-MM-DD`
+- `GET /api/recommendations?date=YYYY-MM-DD&mealType=lunch`
+- `GET /api/dashboard?date=YYYY-MM-DD`
+- `GET /api/feedback?limit=5`
+
+### 写入类 API
+
+- `POST /api/profile`
+- `POST /api/goals`
+- `POST /api/locations`
+- `POST /api/restaurants`
+- `POST /api/daily-context`
+- `POST /api/recommendations`
+- `POST /api/feedback`
+
+### recommendation / OpenClaw 相关 API
+
+- `POST /api/recommendations/generate`
+- `POST /api/recommendations/import`
+- `POST /api/restaurants/enrich`
+- `POST /api/feedback/import`
+
+### OpenClaw 适配层 API
+
+- `POST /api/openclaw/memory`
+- `POST /api/openclaw/location`
+- `POST /api/openclaw/push`
+- `POST /api/openclaw/feedback`
+
+## recommendation 模块结构
+
+### `lib/recommendation/context-builder.ts`
+
+负责聚合：
+
+- user
+- current goal
+- selected location
+- restaurants
+- daily context
+- weather/lunar/astro provider signal
+- recent weight trend
+- recent adherence trend
+
+### `lib/recommendation/rule-engine.ts`
+
+负责输出：
+
+- `STRICT`
+- `BALANCED`
+- `RELAXED`
+- `SOCIAL_COMP`
+- `RECOVERY`
+
+并给出候选餐厅列表。
+
+### `lib/recommendation/narrative-builder.ts`
+
+负责基于叙事风格生成展示文案。
+
+### `lib/recommendation/provider-adapters/`
+
+当前包含：
+
+- `weather.ts`
+- `lunar.ts`
+- `astrology.ts`
+- `openclaw.ts`
+
+默认先走占位/本地适配，后续可以替换成真实外部服务。
+
+## 当前页面状态
+
+### Dashboard
+
+已改成 API 驱动：
+
+- 读取 `/api/dashboard`
+- 不再直接依赖 seed 数据
+- 实时展示当前目标、剩余天数、今日 recommendation、地点数、餐厅数、最近反馈、叙事风格
+
+### 今日建议页
+
+已改成 API 驱动：
+
+- 可选择 `date`
+- 可选择 `mealType`
+- 可选择 location
+- 先保存 `DailyContext`
+- 再调用 `POST /api/recommendations/generate`
+
+## OpenClaw 边界
+
+网页端负责：
+
+- profile / goals / locations / restaurants 的录入与管理
+- DailyContext 的录入
+- recommendation 的展示
 - 调用 OpenClaw 接口
 
 OpenClaw 负责：
 
 - 长期记忆
-- 外部网页信息补全
-- 每日建议生成与主动推送
-- 聊天式反馈入口
+- 餐厅/地点信息补全
+- recommendation 导入
+- 聊天反馈结构化
 - 反馈沉淀
-
-## 已实现的 OpenClaw 接口
-
-代码位置：
-
-- `lib/openclaw.ts`
-- `app/api/openclaw/memory/route.ts`
-- `app/api/openclaw/location/route.ts`
-- `app/api/openclaw/push/route.ts`
-- `app/api/openclaw/feedback/route.ts`
-
-当前支持：
-
-- `pullMemory(userId)`
-- `enrichLocation(locationId)`
-- `pushDailyRecommendation(userId, date)`
-- `pushFeedback(userId, payload)`
-
-默认情况下，这些接口会基于当前 SQLite 数据和规则引擎返回 mock OpenClaw 风格响应；如果后续配置了真实 OpenClaw 服务地址，则可以切换为远程调用。
 
 ## 本地运行
 
@@ -113,20 +226,14 @@ npm run dev
 npm run build
 ```
 
-## 目录结构
+## 第二阶段完成标准
 
-- `app/` 页面、布局与 API Route
-- `components/` 页面组件
-- `lib/` 数据访问、server actions、规则引擎、OpenClaw 适配层
-- `prisma/` schema 和 seed
-- `scripts/` SQLite 初始化脚本
-- `types/` 共享类型
+当前这版已经满足：
 
-## 下一步
+- 录入 profile / goals / locations / restaurants
+- 创建某天的 `DailyContext`
+- 通过 API 触发 recommendation generation
+- 后端基于真实数据库数据生成 recommendation
+- recommendation 可以被未来的 OpenClaw 定时任务导入或覆盖
 
-下一阶段更值得做的事情：
-
-- 让今日建议页优先走 OpenClaw 接口，而不是只走本地规则引擎
-- 增加聊天入口，把自然语言反馈映射到结构化上下文
-- 把地点补全和餐厅补全真正接到 OpenClaw 的外部信息能力
-- 做最近 7 日趋势和反馈闭环，让建议随使用逐渐收敛
+这一步完成后，项目已经从“原型展示站”进入“可联调产品阶段”。

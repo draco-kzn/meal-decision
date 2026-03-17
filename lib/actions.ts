@@ -2,23 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
+import { fromDateKey } from "@/lib/date";
 import { prisma } from "@/lib/prisma";
-import { generateRecommendation } from "@/lib/recommendation-engine";
-import { getWeightTrendKg } from "@/lib/data";
-
-function startOfDay(date = new Date()) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-async function getSingleUser() {
-  const user = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!user) {
-    throw new Error("No user found. Seed the database or create a profile first.");
-  }
-  return user;
-}
+import { generateRecommendation } from "@/lib/recommendation/service";
+import { getCurrentGoal, requirePrimaryUser } from "@/lib/server-core";
 
 export async function saveUserProfile(formData: FormData) {
   const current = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
@@ -44,7 +31,7 @@ export async function saveUserProfile(formData: FormData) {
 }
 
 export async function saveGoal(formData: FormData) {
-  const user = await getSingleUser();
+  const user = await requirePrimaryUser();
   const id = String(formData.get("id") ?? "");
   const data = {
     userId: user.id,
@@ -66,7 +53,7 @@ export async function saveGoal(formData: FormData) {
 }
 
 export async function saveLocation(formData: FormData) {
-  const user = await getSingleUser();
+  const user = await requirePrimaryUser();
   const id = String(formData.get("id") ?? "");
   const data = {
     userId: user.id,
@@ -84,10 +71,7 @@ export async function saveLocation(formData: FormData) {
     await prisma.location.create({ data });
   }
 
-  revalidatePath("/");
   revalidatePath("/locations");
-  revalidatePath("/restaurants");
-  revalidatePath("/today");
 }
 
 export async function saveRestaurant(formData: FormData) {
@@ -114,9 +98,7 @@ export async function saveRestaurant(formData: FormData) {
     await prisma.restaurant.create({ data });
   }
 
-  revalidatePath("/");
   revalidatePath("/restaurants");
-  revalidatePath("/today");
 }
 
 export async function deleteRestaurant(formData: FormData) {
@@ -125,13 +107,12 @@ export async function deleteRestaurant(formData: FormData) {
     await prisma.restaurant.delete({ where: { id } });
   }
   revalidatePath("/restaurants");
-  revalidatePath("/today");
 }
 
 export async function generateTodayRecommendationAction(formData: FormData) {
-  const user = await getSingleUser();
-  const date = startOfDay();
-  const locationId = String(formData.get("currentLocationId") ?? "");
+  const user = await requirePrimaryUser();
+  const date = fromDateKey(String(formData.get("date") ?? new Date().toISOString()));
+  const locationId = String(formData.get("currentLocationId") ?? "") || null;
   const mealType = String(formData.get("mealType") ?? "lunch");
 
   const context = await prisma.dailyContext.upsert({
@@ -142,44 +123,41 @@ export async function generateTodayRecommendationAction(formData: FormData) {
       }
     },
     update: {
-      mood: String(formData.get("mood") ?? ""),
+      currentLocationId: locationId,
+      mood: String(formData.get("mood") ?? "一般"),
       disciplineLevel: String(formData.get("disciplineLevel") ?? "中"),
-      socialPlan: String(formData.get("socialPlan") ?? ""),
-      currentLocationId: locationId || null,
+      socialPlan: String(formData.get("socialPlan") ?? "今晚无社交"),
       weightToday: formData.get("weightToday") ? Number(formData.get("weightToday")) : null,
       stepsToday: formData.get("stepsToday") ? Number(formData.get("stepsToday")) : null,
-      sleepHours: formData.get("sleepHours") ? Number(formData.get("sleepHours")) : null
+      sleepHours: formData.get("sleepHours") ? Number(formData.get("sleepHours")) : null,
+      weatherSummary: String(formData.get("weatherSummary") ?? "") || null,
+      notes: String(formData.get("notes") ?? "")
     },
     create: {
       userId: user.id,
       date,
-      mood: String(formData.get("mood") ?? ""),
+      currentLocationId: locationId,
+      mood: String(formData.get("mood") ?? "一般"),
       disciplineLevel: String(formData.get("disciplineLevel") ?? "中"),
-      socialPlan: String(formData.get("socialPlan") ?? ""),
-      currentLocationId: locationId || null,
+      socialPlan: String(formData.get("socialPlan") ?? "今晚无社交"),
       weightToday: formData.get("weightToday") ? Number(formData.get("weightToday")) : null,
       stepsToday: formData.get("stepsToday") ? Number(formData.get("stepsToday")) : null,
-      sleepHours: formData.get("sleepHours") ? Number(formData.get("sleepHours")) : null
+      sleepHours: formData.get("sleepHours") ? Number(formData.get("sleepHours")) : null,
+      weatherSummary: String(formData.get("weatherSummary") ?? "") || null,
+      notes: String(formData.get("notes") ?? "")
     }
   });
 
-  const [goal, location, restaurants, recentWeightTrendKg] = await Promise.all([
-    prisma.goal.findFirst({ where: { userId: user.id }, orderBy: { targetDate: "asc" } }),
-    locationId ? prisma.location.findUnique({ where: { id: locationId } }) : Promise.resolve(null),
-    prisma.restaurant.findMany({
-      where: locationId ? { locationId } : undefined,
-      orderBy: { healthyScore: "desc" }
-    }),
-    getWeightTrendKg(user.id)
+  const [goal, location] = await Promise.all([
+    getCurrentGoal(user.id),
+    locationId ? prisma.location.findUnique({ where: { id: locationId } }) : null
   ]);
 
-  const recommendation = generateRecommendation({
+  const recommendation = await generateRecommendation({
     user,
     goal,
     location,
-    restaurants,
-    todayContext: context,
-    recentWeightTrendKg,
+    dailyContext: context,
     mealType
   });
 
@@ -197,7 +175,9 @@ export async function generateTodayRecommendationAction(formData: FormData) {
       recommendedOrder: recommendation.recommendedOrder,
       fallbackOption: recommendation.fallbackOption,
       rationale: recommendation.rationale,
-      narrativeLine: recommendation.narrativeLine
+      narrativeLine: recommendation.narrativeLine,
+      sourceType: recommendation.sourceType,
+      rawContextJson: recommendation.rawContextJson
     },
     create: {
       userId: user.id,
@@ -208,7 +188,9 @@ export async function generateTodayRecommendationAction(formData: FormData) {
       recommendedOrder: recommendation.recommendedOrder,
       fallbackOption: recommendation.fallbackOption,
       rationale: recommendation.rationale,
-      narrativeLine: recommendation.narrativeLine
+      narrativeLine: recommendation.narrativeLine,
+      sourceType: recommendation.sourceType,
+      rawContextJson: recommendation.rawContextJson
     }
   });
 
@@ -217,18 +199,17 @@ export async function generateTodayRecommendationAction(formData: FormData) {
 }
 
 export async function saveFeedback(formData: FormData) {
-  const user = await getSingleUser();
+  const user = await requirePrimaryUser();
   await prisma.dailyFeedback.create({
     data: {
       userId: user.id,
-      date: formData.get("date") ? new Date(String(formData.get("date"))) : startOfDay(),
+      date: new Date(String(formData.get("date") ?? new Date().toISOString())),
       restaurantId: String(formData.get("restaurantId") ?? "") || null,
       adherenceLevel: String(formData.get("adherenceLevel") ?? "中"),
       notes: String(formData.get("notes") ?? ""),
-      imageUrl: String(formData.get("imageUrl") ?? "")
+      imageUrl: String(formData.get("imageUrl") ?? "") || null
     }
   });
 
-  revalidatePath("/");
   revalidatePath("/feedback");
 }

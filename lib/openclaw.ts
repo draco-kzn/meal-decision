@@ -1,8 +1,8 @@
-import type { DailyContext, Restaurant, User } from "@prisma/client";
+import type { DailyContext, User } from "@prisma/client";
 
-import { getWeightTrendKg } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
-import { generateRecommendation } from "@/lib/recommendation-engine";
+import { generateRecommendation } from "@/lib/recommendation/service";
+import { ensureDailyContext, getCurrentGoal, listLocations } from "@/lib/server-core";
 import type {
   OpenClawDailyRecommendationResponse,
   OpenClawFeedbackPayload,
@@ -13,12 +13,6 @@ import type {
 
 const OPENCLAW_BASE_URL = process.env.OPENCLAW_BASE_URL?.trim();
 const OPENCLAW_API_KEY = process.env.OPENCLAW_API_KEY?.trim();
-
-function startOfDay(date = new Date()) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
 
 function splitList(value: string) {
   return value
@@ -40,32 +34,18 @@ function toTonePreference(toneStyle: string) {
 
 function toStrategyType(strategyType: string) {
   const map: Record<string, string> = {
-    STRICT_CONTROL: "strict_control",
+    STRICT: "strict",
     BALANCED: "balanced",
     RELAXED: "relaxed",
-    SOCIAL_COMPENSATION: "social_compensation",
+    SOCIAL_COMP: "social_comp",
     RECOVERY: "recovery"
   };
 
   return map[strategyType] ?? "balanced";
 }
 
-function formatBodyTrend(value: number | null | undefined, unit: string) {
-  if (value === null || value === undefined) {
-    return "unknown";
-  }
-
-  return `${value}${unit}`;
-}
-
 function serializeOrderList(value: string) {
   return splitList(value.replace(/[。；;]/g, ","));
-}
-
-function toAvgPriceBand(avgPrice: number) {
-  const low = Math.max(0, Math.floor(avgPrice / 10) * 10);
-  const high = low + 20;
-  return `${low}-${high}`;
 }
 
 async function callOpenClaw<T>(path: string, body: object, fallback: () => Promise<T>): Promise<T> {
@@ -90,6 +70,29 @@ async function callOpenClaw<T>(path: string, body: object, fallback: () => Promi
   return (await response.json()) as T;
 }
 
+function buildVirtualContext(user: User, currentLocationId: string | null, date: Date): DailyContext {
+  return {
+    id: `virtual-${user.id}-${date.toISOString()}`,
+    userId: user.id,
+    date,
+    currentLocationId,
+    mood: "一般",
+    disciplineLevel: "中",
+    socialPlan: "今晚无社交",
+    weightToday: null,
+    stepsToday: null,
+    sleepHours: null,
+    weatherSummary: null,
+    weatherTempC: null,
+    lunarTag: null,
+    solarTermTag: null,
+    astroTag: null,
+    notes: "",
+    createdAt: date,
+    updatedAt: date
+  };
+}
+
 export async function pullMemory(userId: string): Promise<OpenClawMemoryResponse> {
   return callOpenClaw("/memory/pull", { userId }, async () => {
     const user = await prisma.user.findUnique({
@@ -97,15 +100,8 @@ export async function pullMemory(userId: string): Promise<OpenClawMemoryResponse
       include: {
         goals: { orderBy: { targetDate: "asc" } },
         locations: { orderBy: { createdAt: "asc" } },
-        feedbacks: {
-          orderBy: { date: "desc" },
-          take: 5,
-          include: { restaurant: true }
-        },
-        dailyContexts: {
-          orderBy: { date: "desc" },
-          take: 7
-        }
+        feedbacks: { orderBy: { date: "desc" }, take: 5, include: { restaurant: true } },
+        dailyContexts: { orderBy: { date: "desc" }, take: 7 }
       }
     });
 
@@ -134,20 +130,16 @@ export async function pullMemory(userId: string): Promise<OpenClawMemoryResponse
         name: location.name,
         walkRadiusMin: Math.max(1, Math.round(location.walkRadiusM / 80)),
         specialRules: splitList(location.notes)
-          .map((item) => item.toLowerCase().replace(/\s+/g, "_"))
-          .slice(0, 4)
       })),
       recentContext: {
         recentRestaurants: user.feedbacks
           .map((feedback) => feedback.restaurant?.name)
           .filter((value): value is string => Boolean(value)),
-        recentFeedback: user.feedbacks
-          .flatMap((feedback) => splitList(feedback.notes))
-          .slice(0, 6),
+        recentFeedback: user.feedbacks.flatMap((feedback) => splitList(feedback.notes)).slice(0, 6),
         bodyTrend: {
-          weight: formatBodyTrend(latestContext?.weightToday, "kg"),
-          steps: formatBodyTrend(latestContext?.stepsToday, " steps"),
-          sleep: formatBodyTrend(latestContext?.sleepHours, "h")
+          weight: latestContext?.weightToday ? `${latestContext.weightToday}kg` : "unknown",
+          steps: latestContext?.stepsToday ? `${latestContext.stepsToday}` : "unknown",
+          sleep: latestContext?.sleepHours ? `${latestContext.sleepHours}h` : "unknown"
         }
       }
     };
@@ -158,11 +150,7 @@ export async function enrichLocation(locationId: string): Promise<OpenClawLocati
   return callOpenClaw("/location/enrich", { locationId }, async () => {
     const location = await prisma.location.findUnique({
       where: { id: locationId },
-      include: {
-        restaurants: {
-          orderBy: [{ updatedAt: "desc" }, { healthyScore: "desc" }]
-        }
-      }
+      include: { restaurants: { orderBy: [{ updatedAt: "desc" }] } }
     });
 
     if (!location) {
@@ -176,7 +164,7 @@ export async function enrichLocation(locationId: string): Promise<OpenClawLocati
         restaurantId: restaurant.id,
         name: restaurant.name,
         cuisine: restaurant.cuisine,
-        avgPrice: toAvgPriceBand(restaurant.avgPrice),
+        avgPrice: `${Math.max(0, restaurant.avgPrice - 10)}-${restaurant.avgPrice + 10}`,
         walkTimeMin: restaurant.walkMinutes,
         hours: restaurant.openHours,
         recommendedOrder: serializeOrderList(restaurant.recommendedOrders),
@@ -188,140 +176,66 @@ export async function enrichLocation(locationId: string): Promise<OpenClawLocati
   });
 }
 
-function buildVirtualContext(user: User, currentLocationId: string | null, date: Date): DailyContext {
-  return {
-    id: `virtual-${user.id}-${date.toISOString()}`,
-    userId: user.id,
-    date,
-    mood: "一般",
-    disciplineLevel: "中",
-    socialPlan: "今晚无社交",
-    currentLocationId,
-    weightToday: null,
-    stepsToday: null,
-    sleepHours: null,
-    createdAt: date,
-    updatedAt: date
-  };
-}
-
-function pickFallbackRestaurants(restaurants: Restaurant[], chosenId: string | null) {
-  return restaurants
-    .filter((restaurant) => restaurant.id !== chosenId)
-    .sort((a, b) => b.healthyScore + b.satietyScore - (a.healthyScore + a.satietyScore))
-    .slice(0, 2);
-}
-
-function serializeRationale(value: string) {
-  return value
-    .split(/(?<=[。！？])\s*|\s(?=[A-Z\u4e00-\u9fa5])/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export async function pushDailyRecommendation(
   userId: string,
   date: string
 ): Promise<OpenClawDailyRecommendationResponse> {
   return callOpenClaw("/recommendation/push", { userId, date }, async () => {
-    const targetDate = startOfDay(new Date(date));
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new Error(`User ${userId} not found`);
     }
 
-    const [goal, locations, contextFromDb, recentWeightTrendKg] = await Promise.all([
-      prisma.goal.findFirst({
-        where: { userId },
-        orderBy: { targetDate: "asc" }
-      }),
-      prisma.location.findMany({
-        where: { userId },
-        orderBy: { createdAt: "asc" }
-      }),
-      prisma.dailyContext.findUnique({
-        where: {
-          userId_date: {
-            userId,
-            date: targetDate
-          }
-        }
-      }),
-      getWeightTrendKg(userId)
+    const [goal, locations, existingContext] = await Promise.all([
+      getCurrentGoal(userId),
+      listLocations(userId),
+      ensureDailyContext(userId, date)
     ]);
 
-    const location = contextFromDb?.currentLocationId
-      ? await prisma.location.findUnique({ where: { id: contextFromDb.currentLocationId } })
+    const location = existingContext.currentLocationId
+      ? await prisma.location.findUnique({ where: { id: existingContext.currentLocationId } })
       : locations[0] ?? null;
-    const todayContext = contextFromDb ?? buildVirtualContext(user, location?.id ?? null, targetDate);
-    const restaurants = await prisma.restaurant.findMany({
-      where: location ? { locationId: location.id } : undefined,
-      orderBy: [{ healthyScore: "desc" }, { satietyScore: "desc" }]
-    });
 
-    const generated = generateRecommendation({
+    const dailyContext =
+      existingContext ??
+      buildVirtualContext(user, location?.id ?? null, new Date(date));
+
+    const generated = await generateRecommendation({
       user,
       goal,
       location,
-      restaurants,
-      todayContext,
-      recentWeightTrendKg,
+      dailyContext,
       mealType: "lunch"
     });
 
-    await prisma.dailyRecommendation.upsert({
+    const fallbackRestaurant = await prisma.restaurant.findFirst({
       where: {
-        userId_date_mealType: {
-          userId,
-          date: targetDate,
-          mealType: "lunch"
-        }
+        locationId: location?.id
       },
-      update: {
-        strategyType: generated.strategyType,
-        restaurantId: generated.restaurantId,
-        recommendedOrder: generated.recommendedOrder,
-        fallbackOption: generated.fallbackOption,
-        rationale: generated.rationale,
-        narrativeLine: generated.narrativeLine
-      },
-      create: {
-        userId,
-        date: targetDate,
-        mealType: "lunch",
-        strategyType: generated.strategyType,
-        restaurantId: generated.restaurantId,
-        recommendedOrder: generated.recommendedOrder,
-        fallbackOption: generated.fallbackOption,
-        rationale: generated.rationale,
-        narrativeLine: generated.narrativeLine
-      }
+      orderBy: [{ healthyScore: "desc" }, { satietyScore: "desc" }]
     });
-
-    const recommendedRestaurant =
-      restaurants.find((restaurant) => restaurant.id === generated.restaurantId) ?? null;
-    const fallbackRestaurants = pickFallbackRestaurants(restaurants, generated.restaurantId);
 
     return {
       userId,
-      date: targetDate.toISOString().slice(0, 10),
+      date,
       strategyType: toStrategyType(generated.strategyType),
-      restaurant: recommendedRestaurant
+      restaurant: generated.restaurantId
         ? {
-            restaurantId: recommendedRestaurant.id,
-            name: recommendedRestaurant.name
+            restaurantId: generated.restaurantId,
+            name: generated.restaurantName
           }
         : null,
       recommendedOrder: serializeOrderList(generated.recommendedOrder),
-      fallbackOption: fallbackRestaurants.map((restaurant) => ({
-        restaurantId: restaurant.id,
-        name: restaurant.name,
-        recommendedOrder: serializeOrderList(restaurant.recommendedOrders)
-      })),
-      rationale: serializeRationale(generated.rationale),
+      fallbackOption: fallbackRestaurant
+        ? [
+            {
+              restaurantId: fallbackRestaurant.id,
+              name: fallbackRestaurant.name,
+              recommendedOrder: serializeOrderList(fallbackRestaurant.recommendedOrders)
+            }
+          ]
+        : [],
+      rationale: splitList(generated.rationale),
       narrativeLine: generated.narrativeLine
     };
   });
@@ -331,23 +245,21 @@ export async function pushFeedback(
   userId: string,
   payload: OpenClawFeedbackPayload
 ): Promise<OpenClawFeedbackResponse> {
-  return callOpenClaw("/feedback/push", { userId, payload }, async () => {
-    return {
-      userId,
-      date: payload.date,
-      accepted: true,
-      feedbackType: payload.feedbackType ?? "general_feedback",
-      storedPatch: payload.structuredPatch ?? {},
-      summary: payload.rawText
-    };
-  });
+  return callOpenClaw("/feedback/push", { userId, payload }, async () => ({
+    userId,
+    date: payload.date,
+    accepted: true,
+    feedbackType: payload.feedbackType ?? "general_feedback",
+    storedPatch: payload.structuredPatch ?? {},
+    summary: payload.rawText
+  }));
 }
 
 export async function receiveOpenClawPush(payload: unknown) {
   return {
     status: "received",
     payload,
-    message: "OpenClaw push payload received. Route can now be expanded into a real webhook handler."
+    message: "OpenClaw push payload received."
   };
 }
 
@@ -355,7 +267,6 @@ export async function openClawChatEntry(input: { userId: string; message: string
   return {
     status: "placeholder",
     userId: input.userId,
-    message: input.message,
-    hint: "Future hook for routing natural-language requests to OpenClaw chat."
+    message: input.message
   };
 }

@@ -24,7 +24,7 @@ async function main() {
     }
   });
 
-  const goal = await prisma.goal.create({
+  await prisma.goal.create({
     data: {
       userId: user.id,
       title: "五一前减脂并稳定午餐节奏",
@@ -134,13 +134,19 @@ async function main() {
     data: {
       userId: user.id,
       date: new Date("2026-03-17"),
+      currentLocationId: office.id,
       mood: "一般偏累",
       disciplineLevel: "中",
       socialPlan: "今晚无社交",
-      currentLocationId: office.id,
       weightToday: 69.7,
       stepsToday: 2400,
-      sleepHours: 6.2
+      sleepHours: 6.2,
+      weatherSummary: "多云",
+      weatherTempC: 18,
+      lunarTag: "农历二月初八",
+      solarTermTag: "惊蛰后",
+      astroTag: "双鱼月",
+      notes: "下午工作密度高，中午不想排队。"
     }
   });
 
@@ -152,9 +158,16 @@ async function main() {
       strategyType: "BALANCED",
       restaurantId: restaurants[0].id,
       recommendedOrder: "鸡腿肉藜麦能量碗，酱料减半，补一份热汤",
-      fallbackOption: "番茄肥牛乌冬，少喝汤不加炸物",
+      fallbackOption: "一碗乌冬：番茄肥牛乌冬，少喝汤不加炸物",
       rationale: "距离目标日还有一定空间，但今天睡眠一般、工作强度不低，午餐更适合稳定发挥而不是赌意志力。",
-      narrativeLine: "今天别跟自己硬碰硬，吃得稳，下午状态会更值钱。"
+      narrativeLine: "今天别跟自己硬碰硬，吃得稳，下午状态会更值钱。",
+      sourceType: "RULE_ENGINE",
+      rawContextJson: JSON.stringify({
+        date: "2026-03-17",
+        mealType: "lunch",
+        weatherSummary: "多云",
+        locationName: "公司"
+      })
     }
   });
 
@@ -169,7 +182,7 @@ async function main() {
     }
   });
 
-  console.log(`Seeded user ${user.nickname}, goal ${goal.title}`);
+  console.log(`Seeded user ${user.nickname}`);
 }
 
 main()

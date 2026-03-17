@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 function loadDatabaseUrl() {
   const envPath = path.join(process.cwd(), ".env");
   if (!fs.existsSync(envPath)) {
-    return "file:./prisma/dev.db";
+    return "file:./dev.db";
   }
 
   const contents = fs.readFileSync(envPath, "utf8");
@@ -14,7 +14,7 @@ function loadDatabaseUrl() {
     .find((entry) => entry.trim().startsWith("DATABASE_URL="));
 
   if (!line) {
-    return "file:./prisma/dev.db";
+    return "file:./dev.db";
   }
 
   return line.replace("DATABASE_URL=", "").trim().replace(/^"|"$/g, "");
@@ -31,6 +31,20 @@ function resolveDbPath(databaseUrl) {
   }
 
   return path.resolve(process.cwd(), "prisma", filePath);
+}
+
+function getColumns(db, tableName) {
+  return db
+    .prepare(`PRAGMA table_info("${tableName}")`)
+    .all()
+    .map((column) => column.name);
+}
+
+function ensureColumn(db, tableName, columnName, sqlDefinition) {
+  const columns = getColumns(db, tableName);
+  if (!columns.includes(columnName)) {
+    db.exec(`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${sqlDefinition}`);
+  }
 }
 
 const databaseUrl = loadDatabaseUrl();
@@ -108,13 +122,19 @@ db.exec(`
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
     "date" DATETIME NOT NULL,
+    "currentLocationId" TEXT,
     "mood" TEXT NOT NULL,
     "disciplineLevel" TEXT NOT NULL,
     "socialPlan" TEXT NOT NULL,
-    "currentLocationId" TEXT,
     "weightToday" REAL,
     "stepsToday" INTEGER,
     "sleepHours" REAL,
+    "weatherSummary" TEXT,
+    "weatherTempC" REAL,
+    "lunarTag" TEXT,
+    "solarTermTag" TEXT,
+    "astroTag" TEXT,
+    "notes" TEXT NOT NULL DEFAULT '',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "DailyContext_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -132,6 +152,8 @@ db.exec(`
     "fallbackOption" TEXT NOT NULL,
     "rationale" TEXT NOT NULL,
     "narrativeLine" TEXT NOT NULL,
+    "sourceType" TEXT NOT NULL DEFAULT 'RULE_ENGINE',
+    "rawContextJson" TEXT NOT NULL DEFAULT '{}',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "DailyRecommendation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -151,7 +173,20 @@ db.exec(`
     CONSTRAINT "DailyFeedback_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "DailyFeedback_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "Restaurant" ("id") ON DELETE SET NULL ON UPDATE CASCADE
   );
+`);
 
+ensureColumn(db, "DailyContext", "currentLocationId", "TEXT");
+ensureColumn(db, "DailyContext", "weatherSummary", "TEXT");
+ensureColumn(db, "DailyContext", "weatherTempC", "REAL");
+ensureColumn(db, "DailyContext", "lunarTag", "TEXT");
+ensureColumn(db, "DailyContext", "solarTermTag", "TEXT");
+ensureColumn(db, "DailyContext", "astroTag", "TEXT");
+ensureColumn(db, "DailyContext", "notes", "TEXT NOT NULL DEFAULT ''");
+
+ensureColumn(db, "DailyRecommendation", "sourceType", "TEXT NOT NULL DEFAULT 'RULE_ENGINE'");
+ensureColumn(db, "DailyRecommendation", "rawContextJson", "TEXT NOT NULL DEFAULT '{}'");
+
+db.exec(`
   CREATE INDEX IF NOT EXISTS "Goal_userId_idx" ON "Goal"("userId");
   CREATE INDEX IF NOT EXISTS "Location_userId_idx" ON "Location"("userId");
   CREATE INDEX IF NOT EXISTS "Restaurant_locationId_idx" ON "Restaurant"("locationId");
