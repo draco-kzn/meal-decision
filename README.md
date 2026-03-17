@@ -1,27 +1,81 @@
 # 今天吃什么呢？
 
-围绕目标日期的每日饮食与生活决策助手 MVP。
+一个围绕目标日期来做每日饮食与生活决策的个人助理型 Web MVP。
 
-技术栈：
+线上地址：
+
+- https://meal-decision-assistant.vercel.app
+
+## 项目定位
+
+这个项目不是简单的“随机吃什么”工具，而是一个围绕用户目标、地点、当天状态和餐厅知识库来生成建议的决策助手。
+
+第一版重点解决三件事：
+
+- 让用户先把目标、地点和餐厅库整理出来
+- 基于规则引擎给出“今天吃什么”的明确建议
+- 为后续接入 OpenClaw 作为 agent layer 预留完整接口
+
+## 技术栈
 
 - Next.js App Router
-- React + TypeScript
+- React
+- TypeScript
 - Tailwind CSS v4
-- Prisma ORM
+- Prisma Client
 - SQLite
+- Vercel
 
-## 已实现内容
+## 当前能力
 
-- Dashboard：首页展示当前目标、目标剩余天数、今日建议主卡、快速入口
-- 建档页：维护昵称、身高、体重、饮食偏好、禁忌、预算等级、叙事风格
-- 目标页：创建或编辑目标日期、目标类型、强度和备注
-- 地点包页：维护常驻地点、场景标签、出现时段和步行半径
+- Dashboard：首页展示当前目标、剩余天数、今日建议主卡和快捷入口
+- 建档页：维护昵称、身高体重、饮食偏好、饮食禁忌、预算等级、叙事风格
+- 目标页：维护目标标题、目标类型、目标日期、强度和备注
+- 地点包页：维护常驻地点、场景标签、常出现时段、可接受步行距离
 - 餐厅知识库页：按地点筛选餐厅，支持新增、编辑、删除
-- 今日建议页：通过规则引擎生成策略类型、推荐餐厅、推荐点法、备选方案和叙事文案
-- 反馈页：记录执行度、备注和图片 URL 占位字段
-- OpenClaw 预留：`lib/openclaw.ts` 与 `app/api/openclaw/push/route.ts`
+- 今日建议页：根据当天状态生成策略类型、推荐餐厅、推荐点法、备选方案、解释原因和一句叙事文案
+- 反馈页：记录今天实际吃了什么、执行度和备注
+- OpenClaw 适配层：预留长期记忆、地点补全、每日推送、反馈回写的接口
 
-## 初始化
+## OpenClaw 集成边界
+
+应用侧负责：
+
+- 用户建档
+- 目标管理
+- 地点包管理
+- 餐厅知识库展示与维护
+- 今日建议展示
+- 调用 OpenClaw 接口
+
+OpenClaw 负责：
+
+- 长期记忆
+- 外部网页信息补全
+- 每日建议生成与主动推送
+- 聊天式反馈入口
+- 反馈沉淀
+
+## 已实现的 OpenClaw 接口
+
+代码位置：
+
+- `lib/openclaw.ts`
+- `app/api/openclaw/memory/route.ts`
+- `app/api/openclaw/location/route.ts`
+- `app/api/openclaw/push/route.ts`
+- `app/api/openclaw/feedback/route.ts`
+
+当前支持：
+
+- `pullMemory(userId)`
+- `enrichLocation(locationId)`
+- `pushDailyRecommendation(userId, date)`
+- `pushFeedback(userId, payload)`
+
+默认情况下，这些接口会基于当前 SQLite 数据和规则引擎返回 mock OpenClaw 风格响应；如果后续配置了真实 OpenClaw 服务地址，则可以切换为远程调用。
+
+## 本地运行
 
 1. 安装依赖
 
@@ -29,16 +83,15 @@
 npm install
 ```
 
-2. 配置环境变量
-
-```powershell
-Copy-Item .env.example .env
-```
-
-3. 初始化数据库并生成 Prisma Client
+2. 生成 Prisma Client
 
 ```powershell
 npm run db:generate
+```
+
+3. 初始化 SQLite
+
+```powershell
 npm run db:push
 ```
 
@@ -54,58 +107,26 @@ npm run db:seed
 npm run dev
 ```
 
-## SQLite 初始化方式
-
-项目使用 `DATABASE_URL="file:./dev.db"`。
-
-首次运行时执行：
+## 构建验证
 
 ```powershell
-npm run db:push
+npm run build
 ```
-
-该命令会在 `prisma/dev.db` 初始化 SQLite 表结构，并供 Prisma Client 直接使用。
 
 ## 目录结构
 
 - `app/` 页面、布局与 API Route
-- `components/` 页面级组件
-- `lib/` Prisma、server actions、推荐引擎、OpenClaw 占位
-- `prisma/` schema 与 seed
+- `components/` 页面组件
+- `lib/` 数据访问、server actions、规则引擎、OpenClaw 适配层
+- `prisma/` schema 和 seed
+- `scripts/` SQLite 初始化脚本
 - `types/` 共享类型
 
-## 推荐逻辑
+## 下一步
 
-规则引擎位于 `lib/recommendation-engine.ts`，当前实现：
+下一阶段更值得做的事情：
 
-- 距离目标日期越近，越偏向节制策略
-- 最近 7 日体重上升时，减少放松倾向
-- 心情差且睡眠差时，优先恢复型方案
-- 公司场景优先步行 10 分钟内餐厅
-- 晚上有社交时，中午优先做社交补偿策略
-
-后续可直接替换为 GPT-5.4 或 agent 调用层。
-
-## OpenClaw 集成
-
-OpenClaw 适合作为 agent layer，而不是主数据库。
-
-当前已落地的接口适配层位于 `lib/openclaw.ts`，支持：
-
-- `pullMemory(userId)`
-- `enrichLocation(locationId)`
-- `pushDailyRecommendation(userId, date)`
-- `pushFeedback(userId, payload)`
-
-当前已暴露的 API Route：
-
-- `POST /api/openclaw/memory`
-- `POST /api/openclaw/location`
-- `POST /api/openclaw/push`
-- `POST /api/openclaw/feedback`
-
-说明：
-
-- 默认情况下，这些接口会基于当前 SQLite 数据和规则引擎返回 mock OpenClaw 响应
-- 如果设置了 `OPENCLAW_BASE_URL`，则会优先转发到真实 OpenClaw 服务
-- 可选鉴权头使用 `OPENCLAW_API_KEY`
+- 让今日建议页优先走 OpenClaw 接口，而不是只走本地规则引擎
+- 增加聊天入口，把自然语言反馈映射到结构化上下文
+- 把地点补全和餐厅补全真正接到 OpenClaw 的外部信息能力
+- 做最近 7 日趋势和反馈闭环，让建议随使用逐渐收敛
