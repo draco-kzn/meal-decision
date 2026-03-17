@@ -1,0 +1,13 @@
+.next
+node_modules
+dist
+coverage
+.env
+.env.local
+dev.db
+dev.db-journal
+prisma/dev.db
+.vercel
+*.log
+
+.vercel

@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sand-50: #fcf7ef;
+  --color-sand-100: #f5ead8;
+  --color-sand-200: #e8d0ae;
+  --color-sand-300: #d9b785;
+  --color-ink-900: #19120d;
+  --color-ink-700: #534638;
+  --color-ink-500: #7f6e5d;
+  --color-brand-500: #c85b35;
+  --color-brand-600: #ad4621;
+  --color-olive-500: #50644a;
+  --font-display: "Georgia", "STSong", "Songti SC", serif;
+  --font-sans: "Aptos", "PingFang SC", "Microsoft YaHei UI", sans-serif;
+  --shadow-soft: 0 20px 60px rgba(72, 42, 19, 0.12);
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(255, 240, 217, 0.9), transparent 28%),
+    linear-gradient(135deg, #f4efe7 0%, #f6f1eb 45%, #eadbc7 100%);
+  color: var(--color-ink-900);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-ink-900);
+}
+
+::selection {
+  background: rgba(200, 91, 53, 0.18);
+}
+
+.app-shell {
+  position: relative;
+}
+
+.app-shell::before,
+.app-shell::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  height: 22rem;
+  width: 22rem;
+  border-radius: 9999px;
+  filter: blur(56px);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-shell::before {
+  top: -5rem;
+  left: -4rem;
+  background: rgba(240, 194, 124, 0.55);
+}
+
+.app-shell::after {
+  right: -6rem;
+  top: 12rem;
+  background: rgba(200, 91, 53, 0.16);
+}
+
+.glass-card {
+  border: 1px solid rgba(83, 70, 56, 0.1);
+  background: rgba(255, 250, 244, 0.72);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px);
+}
+
+.field {
+  @apply flex flex-col gap-2;
+}
+
+.field-label {
+  @apply text-sm font-medium text-[var(--color-ink-700)];
+}
+
+.field-input,
+.field-textarea,
+.field-select {
+  @apply w-full rounded-2xl border border-[rgba(83,70,56,0.12)] bg-white/80 px-4 py-3 text-sm text-[var(--color-ink-900)] outline-none transition;
+}
+
+.field-input:focus,
+.field-textarea:focus,
+.field-select:focus {
+  @apply border-[rgba(200,91,53,0.45)] ring-4 ring-[rgba(200,91,53,0.12)];
+}
+
+.action-btn-primary {
+  @apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium text-white transition hover:-translate-y-0.5;
+  background: var(--color-brand-500);
+}
+
+.action-btn-primary:hover {
+  background: var(--color-brand-600);
+}
+
+.action-btn-secondary {
+  @apply inline-flex items-center justify-center rounded-full border px-5 py-3 text-sm font-medium text-[var(--color-ink-900)] transition hover:-translate-y-0.5;
+  border-color: rgba(83, 70, 56, 0.14);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.action-btn-secondary:hover {
+  background: white;
+}
+
+.eyebrow {
+  @apply text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-brand-600)];
+}
+
+.stat-pill {
+  @apply rounded-full border border-[rgba(83,70,56,0.1)] bg-white/55 px-3 py-2 text-sm text-[var(--color-ink-700)];
+}

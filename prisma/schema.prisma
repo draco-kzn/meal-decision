@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String               @id @default(cuid())
+  nickname         String
+  heightCm         Int
+  weightKg         Float
+  targetWeightKg   Float?
+  dietPreferences  String
+  restrictions     String
+  budgetLevel      String
+  toneStyle        String
+  goals            Goal[]
+  locations        Location[]
+  dailyContexts    DailyContext[]
+  recommendations  DailyRecommendation[]
+  feedbacks        DailyFeedback[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+}
+
+model Goal {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  goalType   String
+  targetDate DateTime
+  intensity  String
+  notes      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Location {
+  id                String         @id @default(cuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  addressText       String
+  sceneTags         String
+  appearanceWindows String
+  walkRadiusM       Int
+  notes             String
+  restaurants       Restaurant[]
+  dailyContexts     DailyContext[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model Restaurant {
+  id                String               @id @default(cuid())
+  locationId        String
+  location          Location             @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name              String
+  cuisine           String
+  avgPrice          Float
+  openHours         String
+  walkMinutes       Int
+  healthyScore      Int
+  satietyScore      Int
+  riskTags          String
+  recommendedOrders String
+  avoidOrders       String
+  notes             String
+  source            String
+  recommendations   DailyRecommendation[]
+  feedbacks         DailyFeedback[]
+  updatedAt         DateTime             @updatedAt
+  createdAt         DateTime             @default(now())
+}
+
+model DailyContext {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date              DateTime
+  mood              String
+  disciplineLevel   String
+  socialPlan        String
+  currentLocationId String?
+  currentLocation   Location? @relation(fields: [currentLocationId], references: [id], onDelete: SetNull)
+  weightToday       Float?
+  stepsToday        Int?
+  sleepHours        Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+model DailyRecommendation {
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date             DateTime
+  mealType         String
+  strategyType     String
+  restaurantId     String?
+  restaurant       Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  recommendedOrder String
+  fallbackOption   String
+  rationale        String
+  narrativeLine    String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([userId, date, mealType])
+}
+
+model DailyFeedback {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date           DateTime
+  restaurantId   String?
+  restaurant     Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  adherenceLevel String
+  notes          String
+  imageUrl       String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
