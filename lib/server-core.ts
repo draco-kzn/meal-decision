@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { fromDateKey, startOfDay } from "@/lib/date";
 
+function normalizeLookupValue(value: string) {
+  return value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 export async function getPrimaryUser() {
   return prisma.user.findFirst({
     orderBy: { createdAt: "asc" }
@@ -31,12 +35,10 @@ export async function listLocations(userId: string) {
 }
 
 export async function findLocationByName(userId: string, name: string) {
-  return prisma.location.findFirst({
-    where: {
-      userId,
-      name: { equals: name }
-    }
-  });
+  const locations = await listLocations(userId);
+  const target = normalizeLookupValue(name);
+
+  return locations.find((location) => normalizeLookupValue(location.name) === target) ?? null;
 }
 
 export async function listRestaurants(locationId?: string | null, userId?: string | null) {
@@ -56,13 +58,10 @@ export async function listRestaurants(locationId?: string | null, userId?: strin
 }
 
 export async function findRestaurantByName(userId: string, name: string, locationId?: string | null) {
-  return prisma.restaurant.findFirst({
-    where: {
-      name: { equals: name },
-      ...(locationId ? { locationId } : { location: { userId } })
-    },
-    include: { location: true }
-  });
+  const restaurants = await listRestaurants(locationId ?? null, locationId ? null : userId);
+  const target = normalizeLookupValue(name);
+
+  return restaurants.find((restaurant) => normalizeLookupValue(restaurant.name) === target) ?? null;
 }
 
 export async function getDailyContextByDate(userId: string, dateKey?: string | null) {

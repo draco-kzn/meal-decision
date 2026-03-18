@@ -42,7 +42,7 @@
 - TypeScript
 - Tailwind CSS v4
 - Prisma Client
-- SQLite
+- Prisma Postgres
 - Vercel
 
 ## 核心模型
@@ -166,6 +166,7 @@ npm run build
 
 ## 说明
 
-- `npm run db:push` 仍然走本地 SQLite bootstrap 脚本，不依赖 Prisma schema engine
+- `npm run db:push` 现在直接走 Prisma `db push`
+- 本地 Prisma CLI 会自动读取 `.env.local`，方便直接复用 Vercel 拉下来的数据库环境变量
 - Vercel 通过 `postinstall` 自动执行 `prisma generate`
 - 当前推荐仍可由本地规则引擎生成，也可以被 OpenClaw import 覆盖
