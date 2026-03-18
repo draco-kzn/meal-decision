@@ -10,7 +10,10 @@
     "lint": "next lint",
     "db:generate": "node scripts/prisma-cli.mjs generate",
     "db:push": "node scripts/prisma-cli.mjs db push --skip-generate",
-    "db:seed": "node scripts/run-seed.mjs"
+    "db:seed": "node scripts/run-seed.mjs",
+    "openclaw:lunch": "node scripts/openclaw-daily-runner.mjs --mealType lunch --write",
+    "openclaw:dinner": "node scripts/openclaw-daily-runner.mjs --mealType dinner --write",
+    "openclaw:chat": "node scripts/openclaw-chat-feedback.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",

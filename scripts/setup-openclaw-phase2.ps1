@@ -141,6 +141,8 @@ $files["integration\api-contract.md"] = @'
 - Fall back to memory-only mode when APIs are not available.
 - Do not invent missing restaurant facts; write `unknown`.
 - Keep recommendation JSON stable so the website can render it directly.
+- Prefer `locationId` and `restaurantId` in write payloads whenever available.
+- Treat `locationName` and `restaurantName` as fallback matching fields, not the primary contract.
 
 ## Notes for OpenClaw
 - `POST /api/restaurants/enrich` supports either a single restaurant payload or a batch payload with `restaurants: []`.
@@ -180,6 +182,7 @@ GET /api/daily-context?date=2026-03-18
 ## POST /api/restaurants/enrich
 ```json
 {
+  "locationId": "<office-location-id>",
   "locationName": "公司",
   "name": "谷仓能量碗",
   "cuisine": "轻食",
@@ -199,8 +202,8 @@ GET /api/daily-context?date=2026-03-18
   "date": "2026-03-18",
   "mealType": "lunch",
   "strategyType": "balanced",
-  "locationName": "公司",
-  "restaurantName": "谷仓能量碗",
+  "locationId": "<office-location-id>",
+  "restaurantId": "<restaurant-id>",
   "recommendedOrder": ["鸡腿肉藜麦能量碗", "酱料减半", "补一份热汤"],
   "fallbackOption": [
     {
@@ -225,6 +228,7 @@ GET /api/daily-context?date=2026-03-18
   "date": "2026-03-18",
   "feedbackType": "daily_context",
   "rawText": "今天太累了，别给我太严格",
+  "currentLocationId": "<office-location-id>",
   "structuredPatch": {
     "energy": "low",
     "socialTonight": false
@@ -236,7 +240,7 @@ GET /api/daily-context?date=2026-03-18
 ```json
 {
   "date": "2026-03-18",
-  "locationName": "公司",
+  "currentLocationId": "<office-location-id>",
   "energy": "low",
   "wantsSpicy": false,
   "socialTonight": true
@@ -564,6 +568,9 @@ $files["skills\process_chat_feedback.md"] = @'
 4. Update memory if and only if the message reflects a stable preference.
 5. Trigger recommendation refresh if needed.
 
+## Execution
+- `npm run openclaw:chat -- --message "<user message>" --write`
+
 ## Output JSON Schema
 ```json
 {
@@ -641,31 +648,16 @@ name: daily-lunch-recommendation
 schedule: "0 11 * * *"
 timezone: "Asia/Shanghai"
 task: |
-  Run task daily_lunch_recommendation.
-  Read API first:
-  - GET /api/profile
-  - GET /api/goals/current
-  - GET /api/locations
-  - GET /api/restaurants?locationId=...
-  - GET /api/daily-context?date=YYYY-MM-DD
+  Execute:
+  - npm run openclaw:lunch
 
-  Fallback to memory files when API is unavailable.
+  Required environment:
+  - MEAL_APP_BASE_URL=https://meal-decision-assistant.vercel.app
 
-  Output JSON fields:
-  - date
-  - mealType=lunch
-  - strategyType
-  - locationName
-  - restaurantName
-  - recommendedOrder
-  - fallbackOption
-  - rationale
-  - narrativeLine
-  - sourceType=OPENCLAW
-  - confidence
-
-  Write back:
-  - POST /api/recommendations/import
+  Behavior:
+  - read app APIs first
+  - use locationId / restaurantId whenever available
+  - write back through POST /api/recommendations/import
 '@
 
 $files["automation\daily_dinner_recommendation.cron"] = @'
@@ -673,31 +665,16 @@ name: daily-dinner-recommendation
 schedule: "30 17 * * *"
 timezone: "Asia/Shanghai"
 task: |
-  Run task daily_dinner_recommendation.
-  Read API first:
-  - GET /api/profile
-  - GET /api/goals/current
-  - GET /api/locations
-  - GET /api/restaurants?locationId=...
-  - GET /api/daily-context?date=YYYY-MM-DD
+  Execute:
+  - npm run openclaw:dinner
 
-  Fallback to memory files when API is unavailable.
+  Required environment:
+  - MEAL_APP_BASE_URL=https://meal-decision-assistant.vercel.app
 
-  Output JSON fields:
-  - date
-  - mealType=dinner
-  - strategyType
-  - locationName
-  - restaurantName
-  - recommendedOrder
-  - fallbackOption
-  - rationale
-  - narrativeLine
-  - sourceType=OPENCLAW
-  - confidence
-
-  Write back:
-  - POST /api/recommendations/import
+  Behavior:
+  - read app APIs first
+  - use locationId / restaurantId whenever available
+  - write back through POST /api/recommendations/import
 '@
 
 $files["memory\goals\current-goal.md"] = @'

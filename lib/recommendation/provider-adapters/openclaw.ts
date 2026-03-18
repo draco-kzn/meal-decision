@@ -33,7 +33,9 @@ type ImportedRecommendationPayload = {
   date: string;
   mealType?: string;
   strategyType: string;
+  locationId?: string;
   locationName?: string;
+  restaurantId?: string;
   restaurantName?: string;
   restaurant?: {
     restaurantId?: string;
@@ -53,6 +55,7 @@ type StructuredFeedbackPayload = {
   date: string;
   feedbackType?: string;
   rawText?: string;
+  currentLocationId?: string | null;
   structuredPatch?: Record<string, string | number | boolean | null>;
   restaurantId?: string | null;
   restaurantName?: string | null;
@@ -199,10 +202,16 @@ export async function importDailyRecommendation(payload: ImportedRecommendationP
     throw new Error("No user found for recommendation import.");
   }
 
-  const location = payload.locationName ? await findLocationByName(user.id, payload.locationName) : null;
+  const location = payload.locationId
+    ? await prisma.location.findUnique({ where: { id: payload.locationId } })
+    : payload.locationName
+      ? await findLocationByName(user.id, payload.locationName)
+      : null;
   const restaurant =
-    payload.restaurant?.restaurantId
-      ? await prisma.restaurant.findUnique({ where: { id: payload.restaurant.restaurantId } })
+    payload.restaurantId
+      ? await prisma.restaurant.findUnique({ where: { id: payload.restaurantId } })
+      : payload.restaurant?.restaurantId
+        ? await prisma.restaurant.findUnique({ where: { id: payload.restaurant.restaurantId } })
       : payload.restaurant?.name || payload.restaurantName
         ? await findRestaurantByName(
             user.id,
@@ -266,7 +275,11 @@ export async function importStructuredFeedback(payload: StructuredFeedbackPayloa
   const structuredPatch = normalizeStructuredPatch(payload.structuredPatch);
   const locationName =
     typeof structuredPatch.locationName === "string" ? structuredPatch.locationName : undefined;
-  const location = locationName ? await findLocationByName(user.id, locationName) : null;
+  const location = payload.currentLocationId
+    ? await prisma.location.findUnique({ where: { id: payload.currentLocationId } })
+    : locationName
+      ? await findLocationByName(user.id, locationName)
+      : null;
   const restaurant =
     payload.restaurantId
       ? await prisma.restaurant.findUnique({ where: { id: payload.restaurantId } })

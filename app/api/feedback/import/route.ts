@@ -8,6 +8,7 @@ const schema = z.object({
   date: z.string().min(1),
   feedbackType: z.string().default("direct_feedback"),
   rawText: z.string().optional(),
+  currentLocationId: z.string().nullable().optional(),
   structuredPatch: z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
     .optional(),

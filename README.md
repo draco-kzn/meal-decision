@@ -158,6 +158,17 @@ npm run db:seed
 npm run dev
 ```
 
+## OpenClaw Runner
+
+手动触发每日 recommendation runner：
+
+```powershell
+$env:MEAL_APP_BASE_URL="https://meal-decision-assistant.vercel.app"
+npm run openclaw:lunch
+npm run openclaw:dinner
+npm run openclaw:chat -- --message "今天太累了，别给我太严格" --write
+```
+
 ## 构建验证
 
 ```powershell

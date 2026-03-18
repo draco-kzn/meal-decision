@@ -224,6 +224,7 @@ export async function pushDailyRecommendation(
       date,
       mealType,
       strategyType: toStrategyType(generated.strategyType),
+      locationId: location?.id ?? null,
       locationName: location?.name ?? null,
       restaurant: generated.restaurantId
         ? {

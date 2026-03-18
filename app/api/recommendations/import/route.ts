@@ -15,7 +15,9 @@ const schema = z.object({
   date: z.string().min(1),
   mealType: z.string().default("lunch"),
   strategyType: z.string().min(1),
+  locationId: z.string().optional(),
   locationName: z.string().optional(),
+  restaurantId: z.string().optional(),
   restaurantName: z.string().optional(),
   restaurant: z
     .object({

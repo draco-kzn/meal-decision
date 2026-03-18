@@ -57,6 +57,7 @@ export type OpenClawDailyRecommendationResponse = {
   date: string;
   mealType: string;
   strategyType: string;
+  locationId: string | null;
   locationName: string | null;
   restaurant: {
     restaurantId: string;
@@ -78,6 +79,8 @@ export type OpenClawFeedbackPayload = {
   date: string;
   feedbackType?: string;
   rawText: string;
+  currentLocationId?: string | null;
+  restaurantId?: string | null;
   structuredPatch?: Record<string, string | number | boolean | null>;
 };
 
